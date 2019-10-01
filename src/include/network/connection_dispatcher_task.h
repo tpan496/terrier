@@ -38,7 +38,8 @@ class ConnectionDispatcherTask : public common::NotifiableTask {
    * @param thread_registry DedicatedThreadRegistry dependency needed because it eventually spawns more threads in
    * RunTask
    */
-  ConnectionDispatcherTask(bool hot_standby, uint32_t num_handlers, int listen_fd, common::DedicatedThreadOwner *dedicated_thread_owner,
+  ConnectionDispatcherTask(bool hot_standby, uint32_t num_handlers, int listen_fd,
+                           common::DedicatedThreadOwner *dedicated_thread_owner,
                            common::ManagedPointer<ProtocolInterpreter::Provider> interpreter_provider,
                            common::ManagedPointer<ConnectionHandleFactory> connection_handle_factory,
                            common::ManagedPointer<common::DedicatedThreadRegistry> thread_registry);
@@ -55,7 +56,7 @@ class ConnectionDispatcherTask : public common::NotifiableTask {
    * @param flags Unused. This is here to conform to libevent callback function
    * signature.
    */
-  void DispatchConnection(int fd, int16_t);
+  void DispatchConnection(int fd, int16_t flags);
 
   /**
    * Creates all of the ConnectionHandlerTasks (num_handlers of them) and then sits in its event loop until stopped.
