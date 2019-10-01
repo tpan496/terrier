@@ -28,7 +28,7 @@ class AbstractLogProvider {
 
  protected:
   /**
-   * @return true if provider has more records to provide. false otherwise
+   * @return true if provider has more records to provide. false otherwise.
    */
   virtual bool HasMoreRecords() = 0;
 
