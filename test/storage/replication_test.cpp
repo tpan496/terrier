@@ -134,7 +134,7 @@ class ReplicationTests : public TerrierTest {
   }
 };
 
-
+// Tests the correctness of the ReplicationLogProvider
 // NOLINTNEXTLINE
 TEST_F(ReplicationTests, ReplicationLogProviderTest) {
   constexpr uint8_t num_databases = 3;
@@ -155,7 +155,7 @@ TEST_F(ReplicationTests, ReplicationLogProviderTest) {
   // Initialize provider
   ReplicationLogProvider log_provider(std::chrono::seconds(1));
 
-  // We read the contents into buffers, which we hand off the the replication log provider
+  // We read the contents into buffers, which we hand off to the replication log provider
   auto log_file_fd = storage::PosixIoWrappers::Open(LOG_FILE_NAME, O_RDONLY);
   while (true) {
     auto buffer = std::make_unique<network::ReadBuffer>();
@@ -172,6 +172,59 @@ TEST_F(ReplicationTests, ReplicationLogProviderTest) {
                                    recovery_deferred_action_manager_, common::ManagedPointer(&thread_registry_),
                                    &block_store_);
   recovery_manager.StartRecovery();
+  recovery_manager.WaitForRecoveryToFinish();
+
+  // Assert the database creations we committed exist
+  txn = recovery_txn_manager_->BeginTransaction();
+  for (uint8_t i = 0; i < num_databases; i++) {
+    EXPECT_EQ(db_oids[i], recovery_catalog_->GetDatabaseOid(txn, database_name + std::to_string(i)));
+    EXPECT_TRUE(recovery_catalog_->GetDatabaseCatalog(txn, db_oids[i]));
+  }
+  recovery_txn_manager_->Commit(txn, transaction::TransactionUtil::EmptyCallback, nullptr);
+}
+
+// Tests that recovery is able to process logs that arrive will recovery is happening (similar to an online setting like
+// recovery) warning: This test could fail due to the 3 second timeout in the event of terrible thread scheduling or
+// disk latency. The chance of this happening however is extremely low with a three second timeout. NOLINTNEXTLINE
+TEST_F(ReplicationTests, ConcurrentReplicationLogProviderTest) {
+  constexpr uint8_t num_databases = 5;
+  std::string database_name = "testdb";
+  std::vector<catalog::db_oid_t> db_oids;
+  db_oids.reserve(num_databases);
+
+  // Create a bunch of databases and commit, we should see this one after recovery
+  auto *txn = txn_manager_->BeginTransaction();
+  for (uint8_t db_idx = 0; db_idx < num_databases; db_idx++) {
+    db_oids.push_back(CreateDatabase(txn, catalog_, database_name + std::to_string(db_idx)));
+  }
+  txn_manager_->Commit(txn, transaction::TransactionUtil::EmptyCallback, nullptr);
+
+  // Simulate the system "shutting down"
+  ShutdownAndRestartSystem();
+
+  // Initialize provider
+  ReplicationLogProvider log_provider(std::chrono::seconds(3));
+
+  RecoveryManager recovery_manager(&log_provider, common::ManagedPointer(recovery_catalog_), recovery_txn_manager_,
+                                   recovery_deferred_action_manager_, common::ManagedPointer(&thread_registry_),
+                                   &block_store_);
+  recovery_manager.StartRecovery();
+
+  // We read the contents into buffers in a background thread to simulate logs arriving while recovery is running.
+  auto reader_thread = std::thread([&]() {
+    auto log_file_fd = storage::PosixIoWrappers::Open(LOG_FILE_NAME, O_RDONLY);
+    while (true) {
+      auto buffer = std::make_unique<network::ReadBuffer>();
+      auto bytes_read = buffer->FillBufferFrom(log_file_fd);
+
+      if (bytes_read == 0) {
+        break;
+      } else {
+        log_provider.HandBufferToReplication(std::move(buffer));
+      }
+    }
+  });
+  reader_thread.join();
   recovery_manager.WaitForRecoveryToFinish();
 
   // Assert the database creations we committed exist
