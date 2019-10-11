@@ -13,10 +13,10 @@
 #include "gtest/gtest.h"
 #include "loggers/main_logger.h"
 #include "network/connection_handle_factory.h"
+#include "network/manual_packet_util.h"
 #include "network/terrier_server.h"
 #include "traffic_cop/result_set.h"
 #include "traffic_cop/traffic_cop.h"
-#include "util/manual_packet_util.h"
 #include "util/test_harness.h"
 
 namespace terrier::network {
@@ -70,7 +70,7 @@ class NetworkTests : public TerrierTest {
   }
 
   void TestExtendedQuery(uint16_t port) {
-    std::shared_ptr<NetworkIoWrapper> io_socket = ManualPacketUtil::StartConnection(port);
+    std::shared_ptr<NetworkIoWrapper> io_socket = ManualPacketUtil::StartConnection("127.0.0.1", port);
     io_socket->GetWriteQueue()->Reset();
     std::string stmt_name = "prepared_test";
     std::string query = "INSERT INTO foo VALUES($1, $2, $3, $4);";
@@ -140,7 +140,7 @@ TEST_F(NetworkTests, SimpleQueryTest) {
 TEST_F(NetworkTests, BadQueryTest) {
   try {
     TEST_LOG_INFO("[BadQueryTest] Starting, expect errors to be logged");
-    std::shared_ptr<NetworkIoWrapper> io_socket = ManualPacketUtil::StartConnection(port_);
+    std::shared_ptr<NetworkIoWrapper> io_socket = ManualPacketUtil::StartConnection("127.0.0.1", port_);
     PostgresPacketWriter writer(io_socket->GetWriteQueue());
 
     // Build a correct query message, "SELECT A FROM B"

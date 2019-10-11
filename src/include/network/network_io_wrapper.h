@@ -5,6 +5,7 @@
 
 #include "common/exception.h"
 #include "common/utility.h"
+#include "loggers/network_logger.h"
 
 #include "network/network_io_utils.h"
 #include "network/network_types.h"
@@ -31,7 +32,7 @@ class NetworkIoWrapper {
   DISALLOW_COPY_AND_MOVE(NetworkIoWrapper);
 
   /**
-   * @brief Constructor for a PosixSocketIoWrapper
+   * @brief Constructor for a NetworkIoWrapper
    * @param sock_fd The fd this IoWrapper communicates on
    * @param in The ReadBuffer this NetworkIOWrapper uses for reads
    * @param out The WriteQueue this NetworkIOWrapper uses for writes

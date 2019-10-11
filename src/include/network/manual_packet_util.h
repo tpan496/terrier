@@ -7,8 +7,8 @@
 #include <unordered_map>
 
 #include "loggers/test_logger.h"
+#include "manual_packet_util.h"
 #include "network/connection_handle_factory.h"
-#include "util/manual_packet_util.h"
 
 namespace terrier::network {
 /*
@@ -50,14 +50,14 @@ class ManualPacketUtil {
     return ReadUntilMessageOrClose(io_socket, NetworkMessageType::READY_FOR_QUERY);
   }
 
-  static std::shared_ptr<NetworkIoWrapper> StartConnection(uint16_t port) {
+  static std::shared_ptr<NetworkIoWrapper> StartConnection(const std::string &ip_address, uint16_t port) {
     // Manually open a socket
     int socket_fd = socket(AF_INET, SOCK_STREAM, 0);
 
     struct sockaddr_in serv_addr;
     memset(&serv_addr, 0, sizeof(serv_addr));
     serv_addr.sin_family = AF_INET;
-    serv_addr.sin_addr.s_addr = inet_addr("127.0.0.1");
+    serv_addr.sin_addr.s_addr = inet_addr(ip_address.c_str());
     serv_addr.sin_port = htons(port);
 
     int64_t ret = connect(socket_fd, reinterpret_cast<sockaddr *>(&serv_addr), sizeof(serv_addr));
