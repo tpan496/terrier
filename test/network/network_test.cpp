@@ -13,7 +13,6 @@
 #include "gtest/gtest.h"
 #include "loggers/main_logger.h"
 #include "network/connection_handle_factory.h"
-#include "network/manual_packet_util.h"
 #include "network/terrier_server.h"
 #include "traffic_cop/result_set.h"
 #include "traffic_cop/traffic_cop.h"
@@ -69,8 +68,42 @@ class NetworkTests : public TerrierTest {
     TerrierTest::TearDown();
   }
 
+  std::shared_ptr<NetworkIoWrapper> StartPostgresConnection(uint16_t port) {
+    auto io_socket = NetworkConnectionUtil::StartConnection("127.0.0.1", port);
+    PostgresPacketWriter writer(io_socket->GetWriteQueue());
+
+    std::unordered_map<std::string, std::string> params{
+        {"user", "postgres"}, {"database", "postgres"}, {"application_name", "psql"}};
+
+    writer.WriteStartupRequest(params);
+    io_socket->FlushAllWrites();
+
+    NetworkConnectionUtil::ReadUntilReadyOrClose(io_socket);
+    return io_socket;
+  }
+
+/*
+ * Read and write buffer size for the test
+ */
+#define TEST_BUFFER_SIZE 1000
+
+  /**
+   * Closes connection on socket fd
+   * @param socket_fd
+   */
+
+  void TerminateConnection(int socket_fd) {
+    char out_buffer[TEST_BUFFER_SIZE] = {};
+    // Build a correct query message, "SELECT A FROM B"
+    memset(out_buffer, 0, sizeof(out_buffer));
+    out_buffer[0] = 'X';
+    int len = sizeof(int32_t) + sizeof(char);
+    reinterpret_cast<int32_t *>(out_buffer + 1)[0] = htonl(len);
+    const auto result UNUSED_ATTRIBUTE = write(socket_fd, nullptr, len + 1);
+  }
+
   void TestExtendedQuery(uint16_t port) {
-    std::shared_ptr<NetworkIoWrapper> io_socket = ManualPacketUtil::StartConnection("127.0.0.1", port);
+    std::shared_ptr<NetworkIoWrapper> io_socket = StartPostgresConnection(port);
     io_socket->GetWriteQueue()->Reset();
     std::string stmt_name = "prepared_test";
     std::string query = "INSERT INTO foo VALUES($1, $2, $3, $4);";
@@ -79,33 +112,33 @@ class NetworkTests : public TerrierTest {
     auto type_oid = static_cast<int>(PostgresValueType::INTEGER);
     writer.WriteParseCommand(stmt_name, query, std::vector<int>(4, type_oid));
     io_socket->FlushAllWrites();
-    EXPECT_TRUE(ManualPacketUtil::ReadUntilReadyOrClose(io_socket));
+    EXPECT_TRUE(NetworkConnectionUtil::ReadUntilReadyOrClose(io_socket));
 
     std::string portal_name;
     writer.WriteBindCommand(portal_name, stmt_name, {}, {}, {});
     io_socket->FlushAllWrites();
-    EXPECT_TRUE(ManualPacketUtil::ReadUntilReadyOrClose(io_socket));
+    EXPECT_TRUE(NetworkConnectionUtil::ReadUntilReadyOrClose(io_socket));
 
     writer.WriteExecuteCommand(portal_name, 0);
     io_socket->FlushAllWrites();
-    EXPECT_TRUE(ManualPacketUtil::ReadUntilReadyOrClose(io_socket));
+    EXPECT_TRUE(NetworkConnectionUtil::ReadUntilReadyOrClose(io_socket));
 
     // DescribeCommand
     writer.WriteDescribeCommand(DescribeCommandObjectType::STATEMENT, stmt_name);
     io_socket->FlushAllWrites();
-    EXPECT_TRUE(ManualPacketUtil::ReadUntilReadyOrClose(io_socket));
+    EXPECT_TRUE(NetworkConnectionUtil::ReadUntilReadyOrClose(io_socket));
 
     // SyncCommand
     writer.WriteSyncCommand();
     io_socket->FlushAllWrites();
-    EXPECT_TRUE(ManualPacketUtil::ReadUntilReadyOrClose(io_socket));
+    EXPECT_TRUE(NetworkConnectionUtil::ReadUntilReadyOrClose(io_socket));
 
     // CloseCommand
     writer.WriteCloseCommand(DescribeCommandObjectType::STATEMENT, stmt_name);
     io_socket->FlushAllWrites();
-    EXPECT_TRUE(ManualPacketUtil::ReadUntilReadyOrClose(io_socket));
+    EXPECT_TRUE(NetworkConnectionUtil::ReadUntilReadyOrClose(io_socket));
 
-    ManualPacketUtil::TerminateConnection(io_socket->GetSocketFd());
+    TerminateConnection(io_socket->GetSocketFd());
   }
 };
 
@@ -140,14 +173,14 @@ TEST_F(NetworkTests, SimpleQueryTest) {
 TEST_F(NetworkTests, BadQueryTest) {
   try {
     TEST_LOG_INFO("[BadQueryTest] Starting, expect errors to be logged");
-    std::shared_ptr<NetworkIoWrapper> io_socket = ManualPacketUtil::StartConnection("127.0.0.1", port_);
+    std::shared_ptr<NetworkIoWrapper> io_socket = StartPostgresConnection(port);
     PostgresPacketWriter writer(io_socket->GetWriteQueue());
 
     // Build a correct query message, "SELECT A FROM B"
     std::string query = "SELECT A FROM B;";
     writer.WriteSimpleQuery(query);
     io_socket->FlushAllWrites();
-    bool is_ready = ManualPacketUtil::ReadUntilReadyOrClose(io_socket);
+    bool is_ready = NetworkConnectionUtil::ReadUntilReadyOrClose(io_socket);
     EXPECT_TRUE(is_ready);  // should be okay
 
     // Send a bad query packet
@@ -156,7 +189,7 @@ TEST_F(NetworkTests, BadQueryTest) {
     io_socket->GetWriteQueue()->BufferWriteRaw(bad_query.data(), bad_query.length());
     io_socket->FlushAllWrites();
 
-    is_ready = ManualPacketUtil::ReadUntilReadyOrClose(io_socket);
+    is_ready = NetworkConnectionUtil::ReadUntilReadyOrClose(io_socket);
     EXPECT_FALSE(is_ready);
     io_socket->Close();
   } catch (const std::exception &e) {
