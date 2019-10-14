@@ -468,7 +468,7 @@ class NetworkConnectionUtil {
    * @param expected_msg_type
    * @return true if reads the expected type message, false for closed.
    */
-  static bool ReadUntilMessageOrClose(const std::shared_ptr<NetworkIoWrapper> &io_socket,
+  static bool ReadUntilMessageOrClose(const std::unique_ptr<NetworkIoWrapper> &io_socket,
                                       const NetworkMessageType &expected_msg_type) {
     while (true) {
       io_socket->GetReadBuffer()->Reset();
@@ -490,11 +490,11 @@ class NetworkConnectionUtil {
    * @param io_socket
    * @return
    */
-  static bool ReadUntilReadyOrClose(const std::shared_ptr<NetworkIoWrapper> &io_socket) {
+  static bool ReadUntilReadyOrClose(const std::unique_ptr<NetworkIoWrapper> &io_socket) {
     return ReadUntilMessageOrClose(io_socket, NetworkMessageType::READY_FOR_QUERY);
   }
 
-  static std::shared_ptr<NetworkIoWrapper> StartConnection(const std::string &ip_address, uint16_t port) {
+  static std::unique_ptr<NetworkIoWrapper> StartConnection(const std::string &ip_address, uint16_t port) {
     // Manually open a socket
     int socket_fd = socket(AF_INET, SOCK_STREAM, 0);
 
@@ -507,7 +507,7 @@ class NetworkConnectionUtil {
     int64_t ret = connect(socket_fd, reinterpret_cast<sockaddr *>(&serv_addr), sizeof(serv_addr));
     if (ret < 0) NETWORK_LOG_ERROR("Connection Error")
 
-    return std::make_shared<NetworkIoWrapper>(socket_fd);
+    return std::make_unique<NetworkIoWrapper>(socket_fd);
   }
 };
 

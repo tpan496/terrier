@@ -68,7 +68,7 @@ class NetworkTests : public TerrierTest {
     TerrierTest::TearDown();
   }
 
-  std::shared_ptr<NetworkIoWrapper> StartPostgresConnection(uint16_t port) {
+  std::unique_ptr<NetworkIoWrapper> StartPostgresConnection(uint16_t port) {
     auto io_socket = NetworkConnectionUtil::StartConnection("127.0.0.1", port);
     PostgresPacketWriter writer(io_socket->GetWriteQueue());
 
@@ -103,7 +103,7 @@ class NetworkTests : public TerrierTest {
   }
 
   void TestExtendedQuery(uint16_t port) {
-    std::shared_ptr<NetworkIoWrapper> io_socket = StartPostgresConnection(port);
+    auto io_socket = StartPostgresConnection(port);
     io_socket->GetWriteQueue()->Reset();
     std::string stmt_name = "prepared_test";
     std::string query = "INSERT INTO foo VALUES($1, $2, $3, $4);";
@@ -173,7 +173,7 @@ TEST_F(NetworkTests, SimpleQueryTest) {
 TEST_F(NetworkTests, BadQueryTest) {
   try {
     TEST_LOG_INFO("[BadQueryTest] Starting, expect errors to be logged");
-    std::shared_ptr<NetworkIoWrapper> io_socket = StartPostgresConnection(port);
+    auto io_socket = StartPostgresConnection(port_);
     PostgresPacketWriter writer(io_socket->GetWriteQueue());
 
     // Build a correct query message, "SELECT A FROM B"

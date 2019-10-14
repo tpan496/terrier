@@ -53,7 +53,7 @@ class TrafficCopTests : public TerrierTest {
     TerrierTest::TearDown();
   }
 
-  std::shared_ptr<network::NetworkIoWrapper> StartPostgresConnection(uint16_t port) {
+  std::unique_ptr<network::NetworkIoWrapper> StartPostgresConnection(uint16_t port) {
     auto io_socket = network::NetworkConnectionUtil::StartConnection("127.0.0.1", port);
     network::PostgresPacketWriter writer(io_socket->GetWriteQueue());
 
