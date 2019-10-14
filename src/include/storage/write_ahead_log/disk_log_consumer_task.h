@@ -40,6 +40,7 @@ class DiskLogConsumerTask final : public LogConsumerTask {
   void Terminate() override;
 
  private:
+  friend class LogManager;
   // File descriptor for log file
   int out_;
   // Stores callbacks for commit records written to disk but not yet persisted

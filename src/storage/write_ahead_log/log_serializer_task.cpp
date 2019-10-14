@@ -72,8 +72,8 @@ bool LogSerializerTask::Process() {
       buffers_processed = true;
     }
 
-  // Mark the last buffer that was written to as full
-  if (filled_buffer_ != nullptr) HandFilledBufferToConsumers();
+    // Mark the last buffer that was written to as full
+    if (filled_buffer_ != nullptr) HandFilledBufferToConsumers();
 
     // Bulk remove all the transactions we serialized. This prevents having to take the TimestampManager's latch once
     // for each timestamp we remove.
@@ -105,12 +105,13 @@ BufferedLogWriter *LogSerializerTask::GetCurrentWriteBuffer() {
  */
 void LogSerializerTask::HandFilledBufferToConsumers() {
   // If we have replication enabled, we should make a copy of the filled buffer to hand off to the network consumer
-  if (network_consumer_queue_ != DISABLED) {
+  if (replication_consumer_queue_ != DISABLED) {
     BufferedLogWriter *network_buffer;
     empty_buffer_queue_->Dequeue(&network_buffer);
     network_buffer->CopyFromBuffer(filled_buffer_);
     // For now we pass in an empty commit callback vector
-    network_consumer_queue_->Enqueue(std::make_pair(network_buffer, std::vector<CommitCallback>()));
+    replication_consumer_queue_->Enqueue(std::make_pair(network_buffer, std::vector<CommitCallback>()));
+    replication_log_sender_cv_->notify_one();
   }
 
   // Hand over the filled buffer

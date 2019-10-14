@@ -22,24 +22,26 @@ class LogSerializerTask : public common::DedicatedThreadTask {
    * @param buffer_pool buffer pool to use to release serialized buffers
    * @param empty_buffer_queue pointer to queue to pop empty buffers from
    * @param disk_consumer_queue pointer to queue to push filled buffers to disk consumer
-   * @param network_consumer_queue pointer to queue to push filled buffers to network consumer. nullptr if replication
-   * is not enabled
+   * @param replication_consumer_queue pointer to queue to push filled buffers to network consumer. nullptr if
+   * replication is not enabled
    * @param disk_log_writer_thread_cv pointer to condition variable to notify consumer when a new buffer has handed over
    */
   explicit LogSerializerTask(const std::chrono::microseconds serialization_interval,
                              RecordBufferSegmentPool *buffer_pool,
                              common::ConcurrentBlockingQueue<BufferedLogWriter *> *empty_buffer_queue,
                              common::ConcurrentQueue<storage::SerializedLogs> *disk_consumer_queue,
-                             common::ConcurrentQueue<storage::SerializedLogs> *network_consumer_queue,
-                             std::condition_variable *disk_log_writer_thread_cv)
+                             common::ConcurrentQueue<storage::SerializedLogs> *replication_consumer_queue,
+                             std::condition_variable *disk_log_writer_thread_cv,
+                             std::condition_variable *replication_log_sender_thread_cv)
       : run_task_(false),
         serialization_interval_(serialization_interval),
         buffer_pool_(buffer_pool),
         filled_buffer_(nullptr),
         empty_buffer_queue_(empty_buffer_queue),
         disk_consumer_queue_(disk_consumer_queue),
-        network_consumer_queue_(network_consumer_queue),
-        disk_log_writer_thread_cv_(disk_log_writer_thread_cv) {}
+        replication_consumer_queue_(replication_consumer_queue),
+        disk_log_writer_thread_cv_(disk_log_writer_thread_cv),
+        replication_log_sender_cv_(replication_log_sender_thread_cv) {}
 
   /**
    * Runs main disk log writer loop. Called by thread registry upon initialization of thread
@@ -104,13 +106,15 @@ class LogSerializerTask : public common::DedicatedThreadTask {
 
   // The queue containing empty buffers. Task will dequeue a buffer from this queue when it needs a new buffer
   common::ConcurrentBlockingQueue<BufferedLogWriter *> *empty_buffer_queue_;
-  // The queues containing filled buffers for disk and network consumers. Task should push filled serialized buffers
-  // into these queues
-  common::ConcurrentQueue<SerializedLogs> *disk_consumer_queue_;
-  common::ConcurrentQueue<SerializedLogs> *network_consumer_queue_;
 
-  // Condition variable to signal disk log consumer task thread that a new full buffer has been pushed to the queue
+  // The queues containing filled buffers for disk and network consumers. Serializer should push filled serialized
+  // buffers into these queues
+  common::ConcurrentQueue<SerializedLogs> *disk_consumer_queue_;
+  common::ConcurrentQueue<SerializedLogs> *replication_consumer_queue_;
+
+  // Condition variable to signal consumer task threads that a new full buffer has been pushed to the queue
   std::condition_variable *disk_log_writer_thread_cv_;
+  std::condition_variable *replication_log_sender_cv_;
 
   /**
    * Main serialization loop. Calls Process every interval. Processes all the accumulated log records and

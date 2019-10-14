@@ -21,11 +21,18 @@ void LogManager::Start() {
       this /* requester */, log_file_path_.c_str(), persist_interval_, persist_threshold_, &empty_buffer_queue_,
       &disk_consumer_queue_);
 
+  // TODO(Gus): add conditional here depending if replication is enabled
+  // TODO(Gus): replace parameters
+  replication_log_consumer_task_ = thread_registry_->RegisterDedicatedThread<ReplicationLogConsumerTask>(
+      this /* requester */, "", 0, &empty_buffer_queue_, &replication_consumer_queue_);
+
   // Register LogSerializerTask
   log_serializer_task_ = thread_registry_->RegisterDedicatedThread<LogSerializerTask>(
       this /* requester */, serialization_interval_, buffer_pool_, &empty_buffer_queue_, &disk_consumer_queue_,
-      (network_consumer_task_ == DISABLED) ? DISABLED : &network_consumer_queue_,
-      &disk_log_writer_task_->disk_log_writer_thread_cv_);
+      (replication_log_consumer_task_ == DISABLED) ? DISABLED : &replication_consumer_queue_,
+      &disk_log_writer_task_->disk_log_writer_thread_cv_,
+      (replication_log_consumer_task_ == DISABLED) ? DISABLED
+                                                   : &replication_log_consumer_task_->replication_log_sender_cv_);
 }
 
 void LogManager::ForceFlush() {
@@ -58,7 +65,7 @@ void LogManager::PersistAndStop() {
   // Clear buffer queues
   empty_buffer_queue_.Clear();
   disk_consumer_queue_.Clear();
-  network_consumer_queue_.Clear();
+  replication_consumer_queue_.Clear();
   buffers_.clear();
 }
 

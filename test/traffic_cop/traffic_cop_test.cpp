@@ -162,7 +162,8 @@ TEST_F(TrafficCopTests, ManualExtendedQueryTest) {
 
       writer.WriteDescribeCommand(network::DescribeCommandObjectType::PORTAL, portal_name);
       io_socket->FlushAllWrites();
-      network::NetworkConnectionUtil::ReadUntilMessageOrClose(io_socket, network::NetworkMessageType::PG_ROW_DESCRIPTION);
+      network::NetworkConnectionUtil::ReadUntilMessageOrClose(io_socket,
+                                                              network::NetworkMessageType::PG_ROW_DESCRIPTION);
 
       writer.WriteExecuteCommand(portal_name, 0);
       io_socket->FlushAllWrites();
@@ -185,7 +186,8 @@ TEST_F(TrafficCopTests, ManualExtendedQueryTest) {
 
       writer.WriteDescribeCommand(network::DescribeCommandObjectType::PORTAL, portal_name);
       io_socket->FlushAllWrites();
-      network::NetworkConnectionUtil::ReadUntilMessageOrClose(io_socket, network::NetworkMessageType::PG_ROW_DESCRIPTION);
+      network::NetworkConnectionUtil::ReadUntilMessageOrClose(io_socket,
+                                                              network::NetworkMessageType::PG_ROW_DESCRIPTION);
 
       writer.WriteExecuteCommand(portal_name, 0);
       io_socket->FlushAllWrites();
@@ -207,7 +209,8 @@ TEST_F(TrafficCopTests, ManualExtendedQueryTest) {
 
       writer.WriteDescribeCommand(network::DescribeCommandObjectType::PORTAL, portal_name);
       io_socket->FlushAllWrites();
-      network::NetworkConnectionUtil::ReadUntilMessageOrClose(io_socket, network::NetworkMessageType::PG_ROW_DESCRIPTION);
+      network::NetworkConnectionUtil::ReadUntilMessageOrClose(io_socket,
+                                                              network::NetworkMessageType::PG_ROW_DESCRIPTION);
 
       writer.WriteExecuteCommand(portal_name, 0);
       io_socket->FlushAllWrites();

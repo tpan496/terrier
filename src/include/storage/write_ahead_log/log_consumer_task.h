@@ -20,10 +20,8 @@ class LogConsumerTask : public common::DedicatedThreadTask {
    * @param filled_buffer_queue pointer to queue to pop filled buffers from
    */
   explicit LogConsumerTask(common::ConcurrentBlockingQueue<BufferedLogWriter *> *empty_buffer_queue,
-                               common::ConcurrentQueue<storage::SerializedLogs> *filled_buffer_queue)
-      : run_task_(false),
-        empty_buffer_queue_(empty_buffer_queue),
-        filled_buffer_queue_(filled_buffer_queue) {}
+                           common::ConcurrentQueue<storage::SerializedLogs> *filled_buffer_queue)
+      : run_task_(false), empty_buffer_queue_(empty_buffer_queue), filled_buffer_queue_(filled_buffer_queue) {}
 
   friend class LogManager;
   // Flag to signal task to run or stop
