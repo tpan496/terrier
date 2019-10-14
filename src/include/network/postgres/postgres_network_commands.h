@@ -1,5 +1,5 @@
 #pragma once
-#include "network/abstract_network_command.h"
+#include "network/network_command.h"
 
 #define DEFINE_POSTGRES_COMMAND(name, flush)                                                                  \
   class name : public PostgresNetworkCommand {                                                                \
@@ -16,7 +16,7 @@ namespace terrier::network {
 /**
  * Interface for the execution of the standard PostgresNetworkCommands for the postgres protocol
  */
-class PostgresNetworkCommand : public AbstractNetworkCommand {
+class PostgresNetworkCommand : public NetworkCommand {
  public:
   /**
    * Executes the command
@@ -31,8 +31,14 @@ class PostgresNetworkCommand : public AbstractNetworkCommand {
                           common::ManagedPointer<PostgresPacketWriter> out,
                           common::ManagedPointer<trafficcop::TrafficCop> t_cop,
                           common::ManagedPointer<ConnectionContext> connection, NetworkCallback callback) = 0;
+
  protected:
-  PostgresNetworkCommand(InputPacket *in, bool flush) : AbstractNetworkCommand(in, flush) {}
+  /**
+   * Constructor for a PostgresNetworkCommand instance
+   * @param in The input packets to this command
+   * @pram flush Whether or not to flush the output packets on completion
+   */
+  PostgresNetworkCommand(InputPacket *in, bool flush) : NetworkCommand(in, flush) {}
 };
 
 // Set all to force flush for now

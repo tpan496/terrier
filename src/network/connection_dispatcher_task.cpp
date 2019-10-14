@@ -8,7 +8,7 @@
 namespace terrier::network {
 
 ConnectionDispatcherTask::ConnectionDispatcherTask(
-    bool hot_standby, uint32_t num_handlers, int listen_fd, common::DedicatedThreadOwner *dedicated_thread_owner,
+    uint32_t num_handlers, int listen_fd, common::DedicatedThreadOwner *dedicated_thread_owner,
     common::ManagedPointer<ProtocolInterpreter::Provider> interpreter_provider,
     common::ManagedPointer<ConnectionHandleFactory> connection_handle_factory,
     common::ManagedPointer<common::DedicatedThreadRegistry> thread_registry)
@@ -24,6 +24,8 @@ ConnectionDispatcherTask::ConnectionDispatcherTask(
   RegisterSignalEvent(SIGHUP, METHOD_AS_CALLBACK(NotifiableTask, ExitLoop), this);
 }
 
+// TODO(Gus): DispatchConnection will also need to take an argument telling it which interpreter
+// to use for the connection.
 void ConnectionDispatcherTask::DispatchConnection(int fd, int16_t) {  // NOLINT
   struct sockaddr_storage addr;
   socklen_t addrlen = sizeof(addr);

@@ -2,6 +2,7 @@
 
 #include <memory>
 #include <string>
+#include <unordered_map>
 #include <utility>
 #include <vector>
 
@@ -14,14 +15,14 @@ namespace terrier::network {
  * Wrapper around an I/O layer WriteQueue to provide network protocol
  * helper methods.
  */
-class AbstractPacketWriter {
+class PacketWriter {
  public:
   /**
-   * Instantiates a new AbstractPacketWriter backed by the given WriteQueue
+   * Instantiates a new PacketWriter backed by the given WriteQueue
    */
-  explicit AbstractPacketWriter(const std::shared_ptr<WriteQueue> &write_queue) : queue_(*write_queue) {}
+  explicit PacketWriter(const std::shared_ptr<WriteQueue> &write_queue) : queue_(*write_queue) {}
 
-  ~AbstractPacketWriter() {
+  ~PacketWriter() {
     // Make sure no packet is being written on destruction, otherwise we are
     // malformed write buffer
     TERRIER_ASSERT(curr_packet_len_ == nullptr, "packet length is not null");
@@ -29,15 +30,15 @@ class AbstractPacketWriter {
 
   /**
    * Write out a packet with a single type. Some messages will be
-   * special cases since no size field is provided. (SSL_YES, SSL_NO)
+   * special cases since no size field is provided. (PG_SSL_YES, PG_SSL_NO)
    * @param type Type of message to write out
    */
   void WriteSingleTypePacket(NetworkMessageType type) {
     // Make sure no active packet being constructed
     TERRIER_ASSERT(curr_packet_len_ == nullptr, "packet length is null");
     switch (type) {
-      case NetworkMessageType::SSL_YES:
-      case NetworkMessageType::SSL_NO:
+      case NetworkMessageType::PG_SSL_YES:
+      case NetworkMessageType::PG_SSL_NO:
         queue_.BufferWriteRawValue(type);
         break;
       default:
@@ -52,7 +53,7 @@ class AbstractPacketWriter {
    * @param type
    * @return self-reference for chaining
    */
-  AbstractPacketWriter &BeginPacket(NetworkMessageType type) {
+  PacketWriter &BeginPacket(NetworkMessageType type) {
     // No active packet being constructed
     TERRIER_ASSERT(curr_packet_len_ == nullptr, "packet length is null");
     if (type != NetworkMessageType::NO_HEADER) queue_.BufferWriteRawValue(type);
@@ -72,7 +73,7 @@ class AbstractPacketWriter {
    * @param len number of bytes to write
    * @return self-reference for chaining
    */
-  AbstractPacketWriter &AppendRaw(const void *src, size_t len) {
+  PacketWriter &AppendRaw(const void *src, size_t len) {
     TERRIER_ASSERT(curr_packet_len_ != nullptr, "packet length is null");
     queue_.BufferWriteRaw(src, len);
     // Add the size field to the len of the packet. Be mindful of byte
@@ -90,7 +91,7 @@ class AbstractPacketWriter {
    * @return self-reference for chaining
    */
   template <typename T>
-  AbstractPacketWriter &AppendRawValue(T val) {
+  PacketWriter &AppendRawValue(T val) {
     return AppendRaw(&val, sizeof(T));
   }
 
@@ -103,7 +104,7 @@ class AbstractPacketWriter {
    * @return self-reference for chaining
    */
   template <typename T>
-  AbstractPacketWriter &AppendValue(T val) {
+  PacketWriter &AppendValue(T val) {
     // We only want to allow for certain type sizes to be used
     // After the static assert, the compiler should be smart enough to throw
     // away the other cases and only leave the relevant return statement.
@@ -130,7 +131,7 @@ class AbstractPacketWriter {
    * @param nul_terminate whether the nul terminaor should be written as well
    * @return self-reference for chaining
    */
-  AbstractPacketWriter &AppendString(const std::string &str, bool nul_terminate = true) {
+  PacketWriter &AppendString(const std::string &str, bool nul_terminate = true) {
     return AppendRaw(str.data(), nul_terminate ? str.size() + 1 : str.size());
   }
 
@@ -139,7 +140,7 @@ class AbstractPacketWriter {
    * @param error_status The error messages to send
    */
   void WriteErrorResponse(const std::vector<std::pair<NetworkMessageType, std::string>> &error_status) {
-    BeginPacket(NetworkMessageType::ERROR_RESPONSE);
+    BeginPacket(NetworkMessageType::PG_ERROR_RESPONSE);
 
     for (const auto &entry : error_status) AppendRawValue(entry.first).AppendString(entry.second);
 
@@ -163,17 +164,17 @@ class AbstractPacketWriter {
    * @param txn_status
    */
   void WriteReadyForQuery(NetworkTransactionStateType txn_status) {
-    BeginPacket(NetworkMessageType::READY_FOR_QUERY).AppendRawValue(txn_status).EndPacket();
+    BeginPacket(NetworkMessageType::PG_READY_FOR_QUERY).AppendRawValue(txn_status).EndPacket();
   }
 
   /**
    * Writes response to startup message
    */
   void WriteStartupResponse() {
-    BeginPacket(NetworkMessageType::AUTHENTICATION_REQUEST).AppendValue<int32_t>(0).EndPacket();
+    BeginPacket(NetworkMessageType::PG_AUTHENTICATION_REQUEST).AppendValue<int32_t>(0).EndPacket();
 
-    for (auto &entry : PARAMETER_STATUS_MAP)
-      BeginPacket(NetworkMessageType::PARAMETER_STATUS)
+    for (auto &entry : PG_PARAMETER_STATUS_MAP)
+      BeginPacket(NetworkMessageType::PG_PARAMETER_STATUS)
           .AppendString(entry.first)
           .AppendString(entry.second)
           .EndPacket();

@@ -1,19 +1,21 @@
 #pragma once
+
 #include <utility>
+
 #include "common/macros.h"
 #include "common/managed_pointer.h"
-#include "network/abstract_packet_writer.h"
 #include "network/connection_context.h"
 #include "network/network_defs.h"
 #include "network/network_types.h"
+#include "network/packet_writer.h"
 #include "network/protocol_interpreter.h"
 
 namespace terrier::network {
 
 /**
- * Interface for the execution of the AbstractNetworkCommands
+ * Interface for the execution of a NetworkCommand
  */
-class AbstractNetworkCommand {
+class NetworkCommand {
  public:
   /**
    * @return Whether or not to flush the output network packets from this on completion
@@ -23,7 +25,7 @@ class AbstractNetworkCommand {
   /**
    * Default destructor
    */
-  virtual ~AbstractNetworkCommand() = default;
+  virtual ~NetworkCommand() = default;
 
  protected:
   /**
@@ -31,8 +33,7 @@ class AbstractNetworkCommand {
    * @param in The input packets to this command
    * @param flush Whether or not to flush the outuput packets on completion
    */
-  AbstractNetworkCommand(InputPacket *in, bool flush)
-      : in_(in->buf_->ReadIntoView(in->len_)), flush_on_complete_(flush) {}
+  NetworkCommand(InputPacket *in, bool flush) : in_(in->buf_->ReadIntoView(in->len_)), flush_on_complete_(flush) {}
 
   /**
    * The ReadBufferView to read input packets from
