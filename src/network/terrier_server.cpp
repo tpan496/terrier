@@ -11,15 +11,9 @@
 
 namespace terrier::network {
 
-TerrierServer::TerrierServer(common::ManagedPointer<ProtocolInterpreter::Provider> protocol_provider,
-                             common::ManagedPointer<ConnectionHandleFactory> connection_handle_factory,
+TerrierServer::TerrierServer(common::ManagedPointer<ConnectionHandleFactory> connection_handle_factory,
                              common::ManagedPointer<common::DedicatedThreadRegistry> thread_registry)
-    : DedicatedThreadOwner(thread_registry),
-      running_(false),
-      port_(common::Settings::SERVER_PORT),
-      max_connections_(CONNECTION_THREAD_COUNT),
-      connection_handle_factory_(connection_handle_factory),
-      provider_(protocol_provider) {
+    : DedicatedThreadOwner(thread_registry), running_(false), connection_handle_factory_(connection_handle_factory) {
   // For logging purposes
   //  event_enable_debug_mode();
 
@@ -38,31 +32,33 @@ void TerrierServer::RunServer() {
   // This line is critical to performance for some reason
   evthread_use_pthreads();
 
-  int conn_backlog = common::Settings::CONNECTION_BACKLOG;
+  TERRIER_ASSERT(protocols_.size() > 0, "Must register at least one protocol before starting server");
 
-  struct sockaddr_in sin;
-  std::memset(&sin, 0, sizeof(sin));
-  sin.sin_family = AF_INET;
-  sin.sin_addr.s_addr = INADDR_ANY;
-  sin.sin_port = htons(port_);
+  for (auto &protocol : protocols_) {
+    struct sockaddr_in sin;
+    std::memset(&sin, 0, sizeof(sin));
+    sin.sin_family = AF_INET;
+    sin.sin_addr.s_addr = INADDR_ANY;
+    sin.sin_port = htons(protocol.port_);
 
-  listen_fd_ = socket(AF_INET, SOCK_STREAM, 0);
+    protocol.listen_fd_ = socket(AF_INET, SOCK_STREAM, 0);
 
-  if (listen_fd_ < 0) {
-    throw NETWORK_PROCESS_EXCEPTION("Failed to create listen socket");
+    if (protocol.listen_fd_ < 0) {
+      throw NETWORK_PROCESS_EXCEPTION("Failed to create listen socket");
+    }
+
+    int reuse = 1;
+    setsockopt(protocol.listen_fd_, SOL_SOCKET, SO_REUSEADDR, &reuse, sizeof(reuse));
+
+    bind(protocol.listen_fd_, reinterpret_cast<struct sockaddr *>(&sin), sizeof(sin));
+    listen(protocol.listen_fd_, protocol.conn_backlog_);
+
+    dispatcher_task_ = thread_registry_->RegisterDedicatedThread<ConnectionDispatcherTask>(
+        this /* requester */, protocol.max_connections_, protocol.listen_fd_, this,
+        common::ManagedPointer(protocol.provider_.Get()), connection_handle_factory_, thread_registry_);
+
+    NETWORK_LOG_INFO("Listening on port {0}", protocol.port_)
   }
-
-  int reuse = 1;
-  setsockopt(listen_fd_, SOL_SOCKET, SO_REUSEADDR, &reuse, sizeof(reuse));
-
-  bind(listen_fd_, reinterpret_cast<struct sockaddr *>(&sin), sizeof(sin));
-  listen(listen_fd_, conn_backlog);
-
-  dispatcher_task_ = thread_registry_->RegisterDedicatedThread<ConnectionDispatcherTask>(
-      this /* requester */, max_connections_, listen_fd_, this, common::ManagedPointer(provider_.Get()),
-      connection_handle_factory_, thread_registry_);
-
-  NETWORK_LOG_INFO("Listening on port {0}", port_);
 
   // Set the running_ flag for any waiting threads
   {
@@ -76,7 +72,10 @@ void TerrierServer::StopServer() {
   const bool result UNUSED_ATTRIBUTE =
       thread_registry_->StopTask(this, dispatcher_task_.CastManagedPointerTo<common::DedicatedThreadTask>());
   TERRIER_ASSERT(result, "Failed to stop ConnectionDispatcherTask.");
-  TerrierClose(listen_fd_);
+  for (const auto &protocol : protocols_) {
+    TerrierClose(protocol.listen_fd_);
+    NETWORK_LOG_INFO("Closed port {0}", protocol.port_)
+  }
   NETWORK_LOG_INFO("Server Closed");
 
   // Clear the running_ flag for any waiting threads and wake up them up with the condition variable
@@ -86,10 +85,4 @@ void TerrierServer::StopServer() {
   }
   running_cv_.notify_all();
 }
-
-/**
- * Change port to new_port
- */
-void TerrierServer::SetPort(uint16_t new_port) { port_ = new_port; }
-
 }  // namespace terrier::network

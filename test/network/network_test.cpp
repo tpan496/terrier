@@ -36,6 +36,8 @@ class NetworkTests : public TerrierTest {
   std::unique_ptr<ConnectionHandleFactory> handle_factory_;
   common::DedicatedThreadRegistry thread_registry_ = common::DedicatedThreadRegistry(DISABLED);
   uint16_t port_ = common::Settings::SERVER_PORT;
+  uint32_t max_connections_ = CONNECTION_THREAD_COUNT;
+  uint32_t conn_backlog_ = common::Settings::CONNECTION_BACKLOG;
   trafficcop::TrafficCop tcop_;
   FakeCommandFactory fake_command_factory_;
   PostgresProtocolInterpreter::Provider protocol_provider_{
@@ -52,7 +54,8 @@ class NetworkTests : public TerrierTest {
       server_ = std::make_unique<TerrierServer>(
           common::ManagedPointer<ProtocolInterpreter::Provider>(&protocol_provider_),
           common::ManagedPointer(handle_factory_.get()), common::ManagedPointer(&thread_registry_));
-      server_->SetPort(port_);
+      server_->RegisterProtocol(port_, common::ManagedPointer<ProtocolInterpreter::Provider>(&protocol_provider_),
+                                max_connections_, conn_backlog_);
       server_->RunServer();
     } catch (NetworkProcessException &exception) {
       TEST_LOG_ERROR("[LaunchServer] exception when launching server");

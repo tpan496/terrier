@@ -1,4 +1,5 @@
 #include "main/db_main.h"
+#include <common/settings.h>
 #include <memory>
 #include <unordered_map>
 #include <utility>
@@ -56,17 +57,19 @@ DBMain::DBMain(std::unordered_map<settings::Param, settings::ParamInfo> &&param_
 
   command_factory_ = new network::PostgresCommandFactory;
   provider_ = new network::PostgresProtocolInterpreter::Provider(common::ManagedPointer(command_factory_));
-  server_ =
-      new network::TerrierServer(common::ManagedPointer(provider_), common::ManagedPointer(connection_handle_factory_),
-                                 common::ManagedPointer(thread_registry_));
+  server_ = new network::TerrierServer(common::ManagedPointer(connection_handle_factory_),
+                                       common::ManagedPointer(thread_registry_));
+  // Register psql protocol
+  server_->RegisterProtocol(
+      static_cast<int16_t>(
+          type::TransientValuePeeker::PeekInteger(param_map_.find(settings::Param::port)->second.value_)),
+      common::ManagedPointer(provider_), CONNECTION_THREAD_COUNT, common::Settings::CONNECTION_BACKLOG);
 
-  LOG_INFO("Initialization complete");
+  LOG_INFO("Initialization complete")
 }
 
 void DBMain::Run() {
   running_ = true;
-  server_->SetPort(static_cast<int16_t>(
-      type::TransientValuePeeker::PeekInteger(param_map_.find(settings::Param::port)->second.value_)));
   server_->RunServer();
 
   {

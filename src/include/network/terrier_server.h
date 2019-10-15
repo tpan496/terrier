@@ -30,9 +30,9 @@ class TerrierServer : public common::DedicatedThreadOwner {
  public:
   /**
    * @brief Constructs a new TerrierServer instance.
+   * @param port map of port number to protocol to use for that port
    */
-  explicit TerrierServer(common::ManagedPointer<ProtocolInterpreter::Provider> protocol_provider,
-                         common::ManagedPointer<ConnectionHandleFactory> connection_handle_factory,
+  explicit TerrierServer(common::ManagedPointer<ConnectionHandleFactory> connection_handle_factory,
                          common::ManagedPointer<common::DedicatedThreadRegistry> thread_registry);
 
   ~TerrierServer() override = default;
@@ -47,12 +47,6 @@ class TerrierServer : public common::DedicatedThreadOwner {
    * Break from the server loop and exit all network handling threads.
    */
   void StopServer();
-
-  /**
-   * Set listen port to a new port
-   * @param new_port
-   */
-  void SetPort(uint16_t new_port);
 
   /**
    * @return true if the server is still running, false otherwise. Use as a predicate if you're waiting on the RunningCV
@@ -70,7 +64,20 @@ class TerrierServer : public common::DedicatedThreadOwner {
    */
   std::condition_variable &RunningCV() { return running_cv_; }
 
+  void RegisterProtocol(uint16_t port, common::ManagedPointer<ProtocolInterpreter::Provider> provider,
+                        uint32_t max_connections, uint32_t conn_backlog) {
+    protocols_.emplace_back(port, provider, max_connections, conn_backlog, -1 /* dummy value */);
+  }
+
  private:
+  struct Protocol {
+    uint16_t port_;                                                   // port to listen on for protocol
+    common::ManagedPointer<ProtocolInterpreter::Provider> provider_;  // protocol provider
+    uint32_t max_connections_;                                        // max connections for this protocol
+    uint32_t conn_backlog_;                                           // connection backlog for this protocol
+    int listen_fd_;  // Socket fd to listen on for this protocol. Set by TerrierServer::RunServer
+  };
+
   // TODO(Matt): somewhere there's probably a stronger assertion to be made about the state of the server and if
   // threads can be safely taken away, but I don't understand the networking stuff well enough to say for sure what
   // that assertion is
@@ -83,12 +90,10 @@ class TerrierServer : public common::DedicatedThreadOwner {
   // For logging purposes
   // static void LogCallback(int severity, const char *msg);
 
-  uint16_t port_;                   // port number
-  int listen_fd_ = -1;              // server socket fd that TerrierServer is listening on
-  const uint32_t max_connections_;  // maximum number of connections
+  // Protocols to listen for in this server
+  std::vector<Protocol> protocols_;
 
   common::ManagedPointer<ConnectionHandleFactory> connection_handle_factory_;
-  common::ManagedPointer<ProtocolInterpreter::Provider> provider_;
   common::ManagedPointer<ConnectionDispatcherTask> dispatcher_task_;
 };
 }  // namespace terrier::network

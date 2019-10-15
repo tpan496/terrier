@@ -18,10 +18,12 @@ class TrafficCopTests : public TerrierTest {
  protected:
   std::unique_ptr<network::TerrierServer> server_;
   uint16_t port_ = common::Settings::SERVER_PORT;
+  uint32_t max_connections_ = CONNECTION_THREAD_COUNT;
+  uint32_t conn_backlog_ = common::Settings::CONNECTION_BACKLOG;
 
   TrafficCop tcop_;
   network::PostgresCommandFactory command_factory_;
-  network::PostgresProtocolInterpreter::Provider interpreter_provider_{common::ManagedPointer(&command_factory_)};
+  network::PostgresProtocolInterpreter::Provider protocol_provider_{common::ManagedPointer(&command_factory_)};
   std::unique_ptr<network::ConnectionHandleFactory> handle_factory_;
   common::DedicatedThreadRegistry thread_registry_ = common::DedicatedThreadRegistry(DISABLED);
 
@@ -35,10 +37,12 @@ class TrafficCopTests : public TerrierTest {
     try {
       handle_factory_ = std::make_unique<network::ConnectionHandleFactory>(common::ManagedPointer(&tcop_));
       server_ = std::make_unique<network::TerrierServer>(
-          common::ManagedPointer<network::ProtocolInterpreter::Provider>(&interpreter_provider_),
+          common::ManagedPointer<network::ProtocolInterpreter::Provider>(&protocol_provider_),
           common::ManagedPointer(handle_factory_.get()),
           common::ManagedPointer<common::DedicatedThreadRegistry>(&thread_registry_));
-      server_->SetPort(port_);
+      server_->RegisterProtocol(port_,
+                                common::ManagedPointer<network::ProtocolInterpreter::Provider>(&protocol_provider_),
+                                max_connections_, conn_backlog_);
       server_->RunServer();
     } catch (NetworkProcessException &exception) {
       TEST_LOG_ERROR("[LaunchServer] exception when launching server");

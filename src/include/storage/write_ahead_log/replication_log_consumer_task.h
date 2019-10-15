@@ -50,7 +50,8 @@ class ReplicationLogConsumerTask final : public LogConsumerTask {
 
   /**
    * @brief Main task loop.
-   * Loops until task is shut down. In the case of shutdown, guarantees sending of all serialized records at the time of shutdown
+   * Loops until task is shut down. In the case of shutdown, guarantees sending of all serialized records at the time of
+   * shutdown
    */
   void ReplicationLogConsumerTaskLoop();
 
