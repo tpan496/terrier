@@ -1,5 +1,4 @@
 #include "main/db_main.h"
-#include <common/settings.h>
 #include <memory>
 #include <unordered_map>
 #include <utility>
