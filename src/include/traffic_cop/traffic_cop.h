@@ -1,10 +1,8 @@
 #pragma once
-#include <storage/recovery/replication_log_provider.h>
 #include <memory>
 #include <string>
 #include <vector>
 #include "network/postgres/postgres_protocol_utils.h"
-#include "storage/recovery/abstract_log_provider.h"
 #include "traffic_cop/portal.h"
 #include "traffic_cop/sqlite.h"
 #include "traffic_cop/statement.h"
@@ -24,7 +22,7 @@ class TrafficCop {
   /**
    * @param replication_log_provider if given, the tcop will forward replication logs to this provider
    */
-  explicit TrafficCop(common::ManagedPointer<storage::ReplicationLogProvider> replication_log_provider = DISABLED)
+  TrafficCop(common::ManagedPointer<storage::ReplicationLogProvider> replication_log_provider = DISABLED)
       : replication_log_provider_(replication_log_provider) {}
 
   virtual ~TrafficCop() = default;
@@ -43,12 +41,11 @@ class TrafficCop {
     TERRIER_ASSERT(replication_log_provider_ != DISABLED,
                    "Should not be handing off logs if no log provider was given");
     replication_log_provider_->HandBufferToReplication(std::move(buffer));
-  }
 
- private:
-  SqliteEngine sqlite_engine_;
-  // Hands logs off to replication component. TCop should forward these logs through this provider.
-  common::ManagedPointer<storage::ReplicationLogProvider> replication_log_provider_;
-};
+   private:
+    SqliteEngine sqlite_engine_;
+    // Hands logs off to replication component. TCop should forward these logs through this provider.
+    common::ManagedPointer<storage::ReplicationLogProvider> replication_log_provider_;
+  };
 
 }  // namespace terrier::trafficcop
