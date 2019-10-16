@@ -23,8 +23,10 @@ void LogManager::Start() {
 
   // TODO(Gus): add conditional here depending if replication is enabled
   // TODO(Gus): replace parameters
-  replication_log_consumer_task_ = thread_registry_->RegisterDedicatedThread<ReplicationLogConsumerTask>(
-      this /* requester */, "", 0, &empty_buffer_queue_, &replication_consumer_queue_);
+  if (false) {
+    replication_log_consumer_task_ = thread_registry_->RegisterDedicatedThread<ReplicationLogConsumerTask>(
+        this /* requester */, "", 0, &empty_buffer_queue_, &replication_consumer_queue_);
+  }
 
   // Register LogSerializerTask
   log_serializer_task_ = thread_registry_->RegisterDedicatedThread<LogSerializerTask>(

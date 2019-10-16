@@ -64,7 +64,8 @@ class RecoveryManager : public common::DedicatedThreadOwner {
    * @param thread_registry thread registry to register tasks
    * @param store block store used for SQLTable creation during recovery
    */
-  explicit RecoveryManager(AbstractLogProvider *log_provider, common::ManagedPointer<catalog::Catalog> catalog,
+  explicit RecoveryManager(common::ManagedPointer<AbstractLogProvider> log_provider,
+                           common::ManagedPointer<catalog::Catalog> catalog,
                            transaction::TransactionManager *txn_manager,
                            transaction::DeferredActionManager *deferred_action_manager,
                            common::ManagedPointer<terrier::common::DedicatedThreadRegistry> thread_registry,
@@ -112,7 +113,7 @@ class RecoveryManager : public common::DedicatedThreadOwner {
   friend class terrier::RecoveryBenchmark;
 
   // Log provider for reading in logs
-  AbstractLogProvider *log_provider_;
+  common::ManagedPointer<AbstractLogProvider> log_provider_;
 
   // Catalog to fetch table pointers
   common::ManagedPointer<catalog::Catalog> catalog_;

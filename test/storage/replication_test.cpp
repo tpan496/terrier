@@ -40,7 +40,7 @@ class ReplicationTests : public TerrierTest {
   const std::chrono::milliseconds gc_period_{10};
 
   // Original Components
-  common::DedicatedThreadRegistry thread_registry_;
+  common::DedicatedThreadRegistry *thread_registry_;
   LogManager *log_manager_;
   transaction::TimestampManager *timestamp_manager_;
   transaction::DeferredActionManager *deferred_action_manager_;
@@ -61,8 +61,9 @@ class ReplicationTests : public TerrierTest {
     TerrierTest::SetUp();
     // Unlink log file incase one exists from previous test iteration
     unlink(LOG_FILE_NAME);
+    thread_registry_ = new common::DedicatedThreadRegistry(DISABLED);
     log_manager_ = new LogManager(LOG_FILE_NAME, num_log_buffers_, log_serialization_interval_, log_persist_interval_,
-                                  log_persist_threshold_, &buffer_pool_, common::ManagedPointer(&thread_registry_));
+                                  log_persist_threshold_, &buffer_pool_, common::ManagedPointer(thread_registry_));
     log_manager_->Start();
     timestamp_manager_ = new transaction::TimestampManager;
     deferred_action_manager_ = new transaction::DeferredActionManager(timestamp_manager_);
@@ -112,6 +113,7 @@ class ReplicationTests : public TerrierTest {
     delete deferred_action_manager_;
     delete timestamp_manager_;
     delete log_manager_;
+    delete thread_registry_;
   }
 
   catalog::db_oid_t CreateDatabase(transaction::TransactionContext *txn, catalog::Catalog *catalog,
@@ -168,8 +170,9 @@ TEST_F(ReplicationTests, ReplicationLogProviderTest) {
     }
   }
 
-  RecoveryManager recovery_manager(&log_provider, common::ManagedPointer(recovery_catalog_), recovery_txn_manager_,
-                                   recovery_deferred_action_manager_, common::ManagedPointer(&thread_registry_),
+  RecoveryManager recovery_manager(common::ManagedPointer<storage::AbstractLogProvider>(&log_provider),
+                                   common::ManagedPointer(recovery_catalog_), recovery_txn_manager_,
+                                   recovery_deferred_action_manager_, common::ManagedPointer(thread_registry_),
                                    &block_store_);
   recovery_manager.StartRecovery();
   recovery_manager.WaitForRecoveryToFinish();
@@ -185,7 +188,8 @@ TEST_F(ReplicationTests, ReplicationLogProviderTest) {
 
 // Tests that recovery is able to process logs that arrive will recovery is happening (similar to an online setting like
 // recovery) warning: This test could fail due to the 3 second timeout in the event of terrible thread scheduling or
-// disk latency. The chance of this happening however is extremely low with a three second timeout. NOLINTNEXTLINE
+// disk latency. The chance of this happening however is extremely low with a three second timeout.
+// NOLINTNEXTLINE
 TEST_F(ReplicationTests, ConcurrentReplicationLogProviderTest) {
   constexpr uint8_t num_databases = 5;
   std::string database_name = "testdb";
@@ -205,8 +209,9 @@ TEST_F(ReplicationTests, ConcurrentReplicationLogProviderTest) {
   // Initialize provider
   ReplicationLogProvider log_provider(std::chrono::seconds(3));
 
-  RecoveryManager recovery_manager(&log_provider, common::ManagedPointer(recovery_catalog_), recovery_txn_manager_,
-                                   recovery_deferred_action_manager_, common::ManagedPointer(&thread_registry_),
+  RecoveryManager recovery_manager(common::ManagedPointer<storage::AbstractLogProvider>(&log_provider),
+                                   common::ManagedPointer(recovery_catalog_), recovery_txn_manager_,
+                                   recovery_deferred_action_manager_, common::ManagedPointer(thread_registry_),
                                    &block_store_);
   recovery_manager.StartRecovery();
 

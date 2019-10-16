@@ -78,8 +78,9 @@ class RecoveryBenchmark : public benchmark::Fixture {
 
       // Instantiate recovery manager, and recover the tables.
       storage::DiskLogProvider log_provider(LOG_FILE_NAME);
-      storage::RecoveryManager recovery_manager(&log_provider, common::ManagedPointer(&recovered_catalog),
-                                                &recovery_txn_manager, &recovery_deferred_action_manager,
+      storage::RecoveryManager recovery_manager(common::ManagedPointer<storage::AbstractLogProvider>(&log_provider),
+                                                common::ManagedPointer(&recovered_catalog), &recovery_txn_manager,
+                                                &recovery_deferred_action_manager,
                                                 common::ManagedPointer(thread_registry_), &block_store_);
 
       uint64_t elapsed_ms;
@@ -235,8 +236,9 @@ BENCHMARK_DEFINE_F(RecoveryBenchmark, IndexRecovery)(benchmark::State &state) {
 
     // Instantiate recovery manager, and recover the tables.
     storage::DiskLogProvider log_provider(LOG_FILE_NAME);
-    storage::RecoveryManager recovery_manager(&log_provider, common::ManagedPointer(&recovered_catalog),
-                                              &recovery_txn_manager, &recovery_deferred_action_manager,
+    storage::RecoveryManager recovery_manager(common::ManagedPointer<storage::AbstractLogProvider>(&log_provider),
+                                              common::ManagedPointer(&recovered_catalog), &recovery_txn_manager,
+                                              &recovery_deferred_action_manager,
                                               common::ManagedPointer(thread_registry_), &block_store_);
 
     uint64_t elapsed_ms;
