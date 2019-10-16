@@ -22,7 +22,7 @@ class ReplicationLogConsumerTask final : public LogConsumerTask {
                                       common::ConcurrentBlockingQueue<BufferedLogWriter *> *empty_buffer_queue,
                                       common::ConcurrentQueue<storage::SerializedLogs> *filled_buffer_queue)
       : LogConsumerTask(empty_buffer_queue, filled_buffer_queue) {
-    io_wrapper_ = network::NetworkConnectionUtil::StartConnection(ip_address, port);
+    io_wrapper_ = std::make_unique<network::NetworkIoWrapper>(ip_address, port);
   }
 
   /**

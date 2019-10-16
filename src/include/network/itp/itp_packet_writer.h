@@ -35,10 +35,7 @@ class ITPPacketWriter : public PacketWriter {
   /**
    * End the Replication command
    */
-  void EndReplicationCommnad() {
-    EndPacket();
-  }
-
+  void EndReplicationCommmand() { EndPacket(); }
 };
 
 }  // namespace terrier::network

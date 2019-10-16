@@ -3,6 +3,7 @@
 #include <unordered_map>
 #include <utility>
 #include "common/managed_pointer.h"
+#include "common/settings.h"
 #include "loggers/loggers_util.h"
 #include "settings/settings_manager.h"
 #include "settings/settings_param.h"

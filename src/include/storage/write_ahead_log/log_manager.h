@@ -74,8 +74,7 @@ class LogManager : public common::DedicatedThreadOwner {
         buffer_pool_(buffer_pool),
         serialization_interval_(serialization_interval),
         persist_interval_(persist_interval),
-        persist_threshold_(persist_threshold),
-        network_consumer_task_(nullptr) {}
+        persist_threshold_(persist_threshold) {}
 
   /**
    * Starts log manager. Does the following in order:

@@ -51,9 +51,8 @@ class NetworkTests : public TerrierTest {
 
     try {
       handle_factory_ = std::make_unique<ConnectionHandleFactory>(common::ManagedPointer(&tcop_));
-      server_ = std::make_unique<TerrierServer>(
-          common::ManagedPointer<ProtocolInterpreter::Provider>(&protocol_provider_),
-          common::ManagedPointer(handle_factory_.get()), common::ManagedPointer(&thread_registry_));
+      server_ = std::make_unique<TerrierServer>(common::ManagedPointer(handle_factory_.get()),
+                                                common::ManagedPointer(&thread_registry_));
       server_->RegisterProtocol(port_, common::ManagedPointer<ProtocolInterpreter::Provider>(&protocol_provider_),
                                 max_connections_, conn_backlog_);
       server_->RunServer();
@@ -72,7 +71,7 @@ class NetworkTests : public TerrierTest {
   }
 
   std::unique_ptr<NetworkIoWrapper> StartPostgresConnection(uint16_t port) {
-    auto io_socket = NetworkConnectionUtil::StartConnection("127.0.0.1", port);
+    auto io_socket = std::make_unique<NetworkIoWrapper>("127.0.0.1", port);
     PostgresPacketWriter writer(io_socket->GetWriteQueue());
 
     std::unordered_map<std::string, std::string> params{
@@ -81,7 +80,7 @@ class NetworkTests : public TerrierTest {
     writer.WriteStartupRequest(params);
     io_socket->FlushAllWrites();
 
-    NetworkConnectionUtil::ReadUntilReadyOrClose(io_socket);
+    io_socket->ReadUntilMessageOrClose(NetworkMessageType::PG_READY_FOR_QUERY);
     return io_socket;
   }
 
@@ -115,31 +114,31 @@ class NetworkTests : public TerrierTest {
     auto type_oid = static_cast<int>(PostgresValueType::INTEGER);
     writer.WriteParseCommand(stmt_name, query, std::vector<int>(4, type_oid));
     io_socket->FlushAllWrites();
-    EXPECT_TRUE(NetworkConnectionUtil::ReadUntilReadyOrClose(io_socket));
+    EXPECT_TRUE(io_socket->ReadUntilMessageOrClose(NetworkMessageType::PG_READY_FOR_QUERY));
 
     std::string portal_name;
     writer.WriteBindCommand(portal_name, stmt_name, {}, {}, {});
     io_socket->FlushAllWrites();
-    EXPECT_TRUE(NetworkConnectionUtil::ReadUntilReadyOrClose(io_socket));
+    EXPECT_TRUE(io_socket->ReadUntilMessageOrClose(NetworkMessageType::PG_READY_FOR_QUERY));
 
     writer.WriteExecuteCommand(portal_name, 0);
     io_socket->FlushAllWrites();
-    EXPECT_TRUE(NetworkConnectionUtil::ReadUntilReadyOrClose(io_socket));
+    EXPECT_TRUE(io_socket->ReadUntilMessageOrClose(NetworkMessageType::PG_READY_FOR_QUERY));
 
     // DescribeCommand
     writer.WriteDescribeCommand(DescribeCommandObjectType::STATEMENT, stmt_name);
     io_socket->FlushAllWrites();
-    EXPECT_TRUE(NetworkConnectionUtil::ReadUntilReadyOrClose(io_socket));
+    EXPECT_TRUE(io_socket->ReadUntilMessageOrClose(NetworkMessageType::PG_READY_FOR_QUERY));
 
     // SyncCommand
     writer.WriteSyncCommand();
     io_socket->FlushAllWrites();
-    EXPECT_TRUE(NetworkConnectionUtil::ReadUntilReadyOrClose(io_socket));
+    EXPECT_TRUE(io_socket->ReadUntilMessageOrClose(NetworkMessageType::PG_READY_FOR_QUERY));
 
     // CloseCommand
     writer.WriteCloseCommand(DescribeCommandObjectType::STATEMENT, stmt_name);
     io_socket->FlushAllWrites();
-    EXPECT_TRUE(NetworkConnectionUtil::ReadUntilReadyOrClose(io_socket));
+    EXPECT_TRUE(io_socket->ReadUntilMessageOrClose(NetworkMessageType::PG_READY_FOR_QUERY));
 
     TerminateConnection(io_socket->GetSocketFd());
   }
@@ -183,7 +182,7 @@ TEST_F(NetworkTests, BadQueryTest) {
     std::string query = "SELECT A FROM B;";
     writer.WriteSimpleQuery(query);
     io_socket->FlushAllWrites();
-    bool is_ready = NetworkConnectionUtil::ReadUntilReadyOrClose(io_socket);
+    bool is_ready = io_socket->ReadUntilMessageOrClose(NetworkMessageType::PG_READY_FOR_QUERY);
     EXPECT_TRUE(is_ready);  // should be okay
 
     // Send a bad query packet
@@ -192,7 +191,7 @@ TEST_F(NetworkTests, BadQueryTest) {
     io_socket->GetWriteQueue()->BufferWriteRaw(bad_query.data(), bad_query.length());
     io_socket->FlushAllWrites();
 
-    is_ready = NetworkConnectionUtil::ReadUntilReadyOrClose(io_socket);
+    is_ready = io_socket->ReadUntilMessageOrClose(NetworkMessageType::PG_READY_FOR_QUERY);
     EXPECT_FALSE(is_ready);
     io_socket->Close();
   } catch (const std::exception &e) {

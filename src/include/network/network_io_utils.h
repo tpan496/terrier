@@ -7,8 +7,9 @@
 #include <vector>
 
 #include "common/exception.h"
+#include "common/utility.h"
 #include "network/network_defs.h"
-#include "network_io_wrapper.h"
+#include "network/network_types.h"
 #include "util/portable_endian.h"
 
 namespace terrier::network {
@@ -466,12 +467,81 @@ class WriteQueue {
   bool flush_ = false;
 };
 
-/*
- * This util class includes some handy helper functions to establish connections with clients.
+/**
+ * A network io wrapper implements an interface for interacting with a client
+ * connection.
+ *
+ * Underneath the hood the wrapper buffers read and write, and supports posix
+ * and ssl reads and writes to the socket.
+ *
+ * Because the buffers are large and expensive to allocate on fly, they are
+ * reused. Consequently, initialization of this class is handled by a factory
+ * class.
  */
-class NetworkConnectionUtil {
+class NetworkIoWrapper {
  public:
-  NetworkConnectionUtil() = delete;
+  /**
+   * Barring copying and moving of PosixSocketIoWrapper instances
+   */
+  DISALLOW_COPY_AND_MOVE(NetworkIoWrapper);
+
+  /**
+   * @brief Constructor for a NetworkIoWrapper
+   * @param sock_fd The fd this IoWrapper communicates on
+   * @param in The ReadBuffer this NetworkIOWrapper uses for reads
+   * @param out The WriteQueue this NetworkIOWrapper uses for writes
+   */
+  explicit NetworkIoWrapper(int sock_fd, std::shared_ptr<ReadBuffer> in = std::make_shared<ReadBuffer>(),
+                            std::shared_ptr<WriteQueue> out = std::make_shared<WriteQueue>())
+      : sock_fd_(sock_fd), in_(std::move(in)), out_(std::move(out)) {
+    in_->Reset();
+    out_->Reset();
+    RestartState();
+  }
+
+  /**
+   * Constructor for NetworkIoWrapper that opens a socket
+   * @param ip_address ip address to connect to
+   * @param port port to open connection on
+   */
+  NetworkIoWrapper(const std::string &ip_address, uint16_t port);
+
+  /**
+   * @return whether or not SSL is able to be handled by this IOWrapper
+   */
+  bool SslAble() const { return false; }
+
+  /**
+   * @brief Fills the read buffer of this IOWrapper from the assigned fd
+   * @return The next transition for this client's state machine
+   */
+  Transition FillReadBuffer();
+
+  /**
+   * @return Whether or not this IOWrapper is configured to flush its writes when this is called
+   */
+  bool ShouldFlush() { return out_->ShouldFlush(); }
+
+  /**
+   * @brief Flushes the write buffer of this IOWrapper to the assigned fd
+   * @return The next transition for this client's state machine
+   */
+  Transition FlushWriteBuffer(WriteBuffer *wbuf);
+
+  /**
+   * @brief Flushes all writes to this IOWrapper
+   * @return The next transition for this client's state machine
+   */
+  Transition FlushAllWrites();
+
+  /**
+   * @brief Closes this IOWrapper
+   * @return The next transition for this client's state machine
+   */
+  Transition Close() {
+    TerrierClose(sock_fd_);
+    return Transition::PROCEED;
+  }
 
   /**
    * Read packet from the server (without parsing) until receiving ReadyForQuery or the connection is closed.
@@ -479,47 +549,36 @@ class NetworkConnectionUtil {
    * @param expected_msg_type
    * @return true if reads the expected type message, false for closed.
    */
-  static bool ReadUntilMessageOrClose(const std::unique_ptr<NetworkIoWrapper> &io_socket,
-                                      const NetworkMessageType &expected_msg_type) {
-    while (true) {
-      io_socket->GetReadBuffer()->Reset();
-      Transition trans = io_socket->FillReadBuffer();
-      if (trans == Transition::TERMINATE) return false;
-
-      while (io_socket->GetReadBuffer()->HasMore()) {
-        auto type = io_socket->GetReadBuffer()->ReadValue<NetworkMessageType>();
-        auto size = io_socket->GetReadBuffer()->ReadValue<int32_t>();
-        if (size >= 4) io_socket->GetReadBuffer()->Skip(static_cast<size_t>(size - 4));
-
-        if (type == expected_msg_type) return true;
-      }
-    }
-  }
+  bool ReadUntilMessageOrClose(const NetworkMessageType &expected_msg_type);
 
   /**
-   * A wrapper for ReadUntilMessageOrClose since most of the times people expect READY_FOR_QUERY.
-   * @param io_socket
-   * @return
+   * @brief Restarts this IOWrapper
    */
-  static bool ReadUntilReadyOrClose(const std::unique_ptr<NetworkIoWrapper> &io_socket) {
-    return ReadUntilMessageOrClose(io_socket, NetworkMessageType::READY_FOR_QUERY);
-  }
+  void Restart();
 
-  static std::unique_ptr<NetworkIoWrapper> StartConnection(const std::string &ip_address, uint16_t port) {
-    // Manually open a socket
-    int socket_fd = socket(AF_INET, SOCK_STREAM, 0);
+  /**
+   * @return The socket file descriptor this IOWrapper communciates on
+   */
+  int GetSocketFd() { return sock_fd_; }
 
-    struct sockaddr_in serv_addr;
-    memset(&serv_addr, 0, sizeof(serv_addr));
-    serv_addr.sin_family = AF_INET;
-    serv_addr.sin_addr.s_addr = inet_addr(ip_address.c_str());
-    serv_addr.sin_port = htons(port);
+  /**
+   * @return The ReadBuffer for this IOWrapper
+   */
+  std::shared_ptr<ReadBuffer> GetReadBuffer() { return in_; }
 
-    int64_t ret = connect(socket_fd, reinterpret_cast<sockaddr *>(&serv_addr), sizeof(serv_addr));
-    if (ret < 0) NETWORK_LOG_ERROR("Connection Error")
+  /**
+   * @return The WriteQueue for this IOWrapper
+   */
+  std::shared_ptr<WriteQueue> GetWriteQueue() { return out_; }
 
-    return std::make_unique<NetworkIoWrapper>(socket_fd);
-  }
+ private:
+  // The file descriptor associated with this NetworkIoWrapper
+  int sock_fd_;
+  // The ReadBuffer associated with this NetworkIoWrapper
+  std::shared_ptr<ReadBuffer> in_;
+  // The WriteQueue associated with this NetworkIoWrapper
+  std::shared_ptr<WriteQueue> out_;
+
+  void RestartState();
 };
-
 }  // namespace terrier::network

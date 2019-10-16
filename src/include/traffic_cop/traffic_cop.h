@@ -24,7 +24,7 @@ class TrafficCop {
   /**
    * @param replication_log_provider if given, the tcop will forward replication logs to this provider
    */
-  TrafficCop(common::ManagedPointer<storage::ReplicationLogProvider> replication_log_provider = DISABLED)
+  explicit TrafficCop(common::ManagedPointer<storage::ReplicationLogProvider> replication_log_provider = DISABLED)
       : replication_log_provider_(replication_log_provider) {}
 
   virtual ~TrafficCop() = default;

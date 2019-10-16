@@ -24,7 +24,7 @@
 
 #include "network/connection_context.h"
 #include "network/connection_handler_task.h"
-#include "network/network_io_wrapper.h"
+#include "network/network_io_utils.h"
 #include "network/network_types.h"
 #include "network/postgres/postgres_command_factory.h"
 #include "network/postgres/postgres_protocol_interpreter.h"
