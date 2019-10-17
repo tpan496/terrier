@@ -62,8 +62,9 @@ class ReplicationTests : public TerrierTest {
     // Unlink log file incase one exists from previous test iteration
     unlink(LOG_FILE_NAME);
     thread_registry_ = new common::DedicatedThreadRegistry(DISABLED);
-    log_manager_ = new LogManager(LOG_FILE_NAME, num_log_buffers_, log_serialization_interval_, log_persist_interval_,
-                                  log_persist_threshold_, &buffer_pool_, common::ManagedPointer(thread_registry_));
+    log_manager_ =
+        new LogManager(LOG_FILE_NAME, num_log_buffers_, log_serialization_interval_, log_persist_interval_,
+                       log_persist_threshold_, "", 0, &buffer_pool_, common::ManagedPointer(thread_registry_));
     log_manager_->Start();
     timestamp_manager_ = new transaction::TimestampManager;
     deferred_action_manager_ = new transaction::DeferredActionManager(timestamp_manager_);

@@ -26,7 +26,9 @@ class ITPPacketWriter : public PacketWriter {
    * @param message_id message id
    * @param data_size total size of replication data to be added
    */
-  void BeginReplicationCommand(uint64_t message_id) { BeginPacket(NetworkMessageType::ITP_REPLICATION_COMMAND); }
+  void BeginReplicationCommand(uint64_t message_id, uint64_t data_size) {
+    BeginPacket(NetworkMessageType::ITP_REPLICATION_COMMAND).AppendValue(message_id).AppendValue(data_size);
+  }
 
   /**
    * End the Replication command
@@ -38,13 +40,10 @@ class ITPPacketWriter : public PacketWriter {
    */
   void StopReplicationCommand() { BeginPacket(NetworkMessageType::ITP_STOP_REPLICATION_COMMAND); }
 
-
   /**
    * Tells the client that the command is complete.
    */
-  void WriteCommandComplete() {
-    BeginPacket(NetworkMessageType::ITP_REPLICATION_COMPLETE).EndPacket();
-  }
+  void WriteCommandComplete() { BeginPacket(NetworkMessageType::ITP_COMMAND_COMPLETE).EndPacket(); }
 };
 
 }  // namespace terrier::network

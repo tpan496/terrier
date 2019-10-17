@@ -21,11 +21,10 @@ void LogManager::Start() {
       this /* requester */, log_file_path_.c_str(), persist_interval_, persist_threshold_, &empty_buffer_queue_,
       &disk_consumer_queue_);
 
-  // TODO(Gus): add conditional here depending if replication is enabled
-  // TODO(Gus): replace parameters
-  if (false) {
+  // If an IP address was provided, we register a replication task
+  if (!ip_address_.empty()) {
     replication_log_consumer_task_ = thread_registry_->RegisterDedicatedThread<ReplicationLogConsumerTask>(
-        this /* requester */, "", 0, &empty_buffer_queue_, &replication_consumer_queue_);
+        this /* requester */, ip_address_, replication_port_, &empty_buffer_queue_, &replication_consumer_queue_);
   }
 
   // Register LogSerializerTask
@@ -60,9 +59,17 @@ void LogManager::PersistAndStop() {
       thread_registry_->StopTask(this, log_serializer_task_.CastManagedPointerTo<common::DedicatedThreadTask>());
   TERRIER_ASSERT(result, "LogSerializerTask should have been stopped");
 
+  if (replication_log_consumer_task_) {
+    result = thread_registry_->StopTask(
+        this, replication_log_consumer_task_.CastManagedPointerTo<common::DedicatedThreadTask>());
+    TERRIER_ASSERT(result, "ReplicationLogConsumerTask should have been stopped");
+    TERRIER_ASSERT(replication_consumer_queue_.Empty(),
+                   "ReplicationLogConsumerTask should have processed all filled buffers\n");
+  }
+
   result = thread_registry_->StopTask(this, disk_log_writer_task_.CastManagedPointerTo<common::DedicatedThreadTask>());
   TERRIER_ASSERT(result, "DiskLogConsumerTask should have been stopped");
-  TERRIER_ASSERT(disk_consumer_queue_.Empty(), "disk log consumer task should have processed all filled buffers\n");
+  TERRIER_ASSERT(disk_consumer_queue_.Empty(), "DiskLogConsumerTask should have processed all filled buffers\n");
 
   // Clear buffer queues
   empty_buffer_queue_.Clear();

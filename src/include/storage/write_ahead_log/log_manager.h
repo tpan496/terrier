@@ -47,6 +47,8 @@ class LogManager : public common::DedicatedThreadOwner {
   DECLARE_ANNOTATION(SERIALIZATION_INTERVAL)
   DECLARE_ANNOTATION(PERSIST_INTERVAL)
   DECLARE_ANNOTATION(PERSIST_THRESHOLD)
+  DECLARE_ANNOTATION(IP_ADDRESS)
+  DECLARE_ANNOTATION(REPLICATION_PORT)
 
   /**
    * Constructs a new LogManager, writing its logs out to the given file.
@@ -57,6 +59,8 @@ class LogManager : public common::DedicatedThreadOwner {
    * @param serialization_interval Interval time between log serializations
    * @param persist_interval Interval time between log flushing
    * @param persist_threshold data written threshold to trigger log file persist
+   * @param ip_address address to ship logs to, empty string if replication is disabled
+   * @param replication_port if replication is enabled, port number to use for log shipping
    * @param buffer_pool the object pool to draw log buffers from. This must be the same pool transactions draw their
    *                    buffers from
    * @param thread_registry DedicatedThreadRegistry dependency injection
@@ -65,7 +69,9 @@ class LogManager : public common::DedicatedThreadOwner {
                   (named = NUM_BUFFERS) uint64_t num_buffers,
                   (named = SERIALIZATION_INTERVAL) std::chrono::microseconds serialization_interval,
                   (named = PERSIST_INTERVAL) std::chrono::milliseconds persist_interval,
-                  (named = PERSIST_THRESHOLD) uint64_t persist_threshold, RecordBufferSegmentPool *buffer_pool,
+                  (named = PERSIST_THRESHOLD) uint64_t persist_threshold,
+                  (named = IP_ADDRESS) const std::string &ip_address,
+                  (named = REPLICATION_PORT) uint16_t replication_port, RecordBufferSegmentPool *buffer_pool,
                   common::ManagedPointer<terrier::common::DedicatedThreadRegistry> thread_registry)
       : DedicatedThreadOwner(thread_registry),
         run_log_manager_(false),
@@ -74,13 +80,16 @@ class LogManager : public common::DedicatedThreadOwner {
         buffer_pool_(buffer_pool),
         serialization_interval_(serialization_interval),
         persist_interval_(persist_interval),
-        persist_threshold_(persist_threshold) {}
+        persist_threshold_(persist_threshold),
+        ip_address_(ip_address),
+        replication_port_(replication_port) {}
 
   /**
    * Starts log manager. Does the following in order:
    *    1. Initialize buffers to pass serialized logs to log consumers
    *    2. Starts up DiskLogConsumerTask
-   *    3. Starts up LogSerializerTask
+   *    3. Starts up ReplicationLogConsumerTask (if replication enabled)
+   *    4. Starts up LogSerializerTask
    */
   void Start();
 
@@ -176,6 +185,10 @@ class LogManager : public common::DedicatedThreadOwner {
   // Log consumer task that sends logs over network to replicas
   common::ManagedPointer<ReplicationLogConsumerTask> replication_log_consumer_task_ =
       common::ManagedPointer<ReplicationLogConsumerTask>(nullptr);
+  // IP address to ship logs to, empty string if replication is disabled
+  const std::string ip_address_;
+  // If replication is enabled, port number to use for log shipping
+  const uint16_t replication_port_;
 
   /**
    * If the central registry wants to removes our thread used for the disk log consumer task, we only allow removal if

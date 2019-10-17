@@ -37,7 +37,7 @@ void ReplicationLogConsumerTask::SendLogsOverNetwork() {
     // Return buffer to log manager
     empty_buffer_queue_->Enqueue(buffer);
   }
-  packet_writer.EndReplicationCommmand();
+  packet_writer.EndReplicationCommand();
 
   // Send packet over network
   io_wrapper_->FlushAllWrites();

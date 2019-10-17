@@ -3,6 +3,7 @@
 #include <string>
 #include <vector>
 #include "network/postgres/postgres_protocol_utils.h"
+#include "storage/recovery/replication_log_provider.h"
 #include "traffic_cop/portal.h"
 #include "traffic_cop/sqlite.h"
 #include "traffic_cop/statement.h"
@@ -41,11 +42,21 @@ class TrafficCop {
     TERRIER_ASSERT(replication_log_provider_ != DISABLED,
                    "Should not be handing off logs if no log provider was given");
     replication_log_provider_->HandBufferToReplication(std::move(buffer));
+  }
 
-   private:
-    SqliteEngine sqlite_engine_;
-    // Hands logs off to replication component. TCop should forward these logs through this provider.
-    common::ManagedPointer<storage::ReplicationLogProvider> replication_log_provider_;
-  };
+  /**
+   * Signals to the replication component to stop
+   */
+  void StopReplication() {
+    TERRIER_ASSERT(replication_log_provider_ != DISABLED,
+                   "Can't stop replication, no replication log provider was given");
+    replication_log_provider_->EndReplication();
+  }
+
+ private:
+  SqliteEngine sqlite_engine_;
+  // Hands logs off to replication component. TCop should forward these logs through this provider.
+  common::ManagedPointer<storage::ReplicationLogProvider> replication_log_provider_;
+};
 
 }  // namespace terrier::trafficcop

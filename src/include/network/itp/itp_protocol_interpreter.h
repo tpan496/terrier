@@ -7,9 +7,9 @@
 #include "loggers/network_logger.h"
 #include "network/connection_context.h"
 #include "network/connection_handle.h"
-#include "network/postgres/itp_command_factory.h"
-#include "network/postgres/itp_network_commands.h"
-#include "network/postgres/itp_packet_writer.h"
+#include "network/itp/itp_command_factory.h"
+#include "network/itp/itp_network_commands.h"
+#include "network/itp/itp_packet_writer.h"
 #include "network/protocol_interpreter.h"
 
 namespace terrier::network {
@@ -44,7 +44,7 @@ class ITPProtocolInterpreter : public ProtocolInterpreter {
   /**
    * Default constructor
    */
-  explicit ITPProtocolInterpreter(common::ManagedPointer<PostgresCommandFactory> command_factory)
+  explicit ITPProtocolInterpreter(common::ManagedPointer<ITPCommandFactory> command_factory)
       : command_factory_(command_factory) {}
 
   /**
@@ -66,11 +66,10 @@ class ITPProtocolInterpreter : public ProtocolInterpreter {
    */
   void GetResult(std::shared_ptr<WriteQueue> out) override {
     ITPPacketWriter writer(out);
-    out->BeginPacket(NetworkMessageType::ITP_COMMAND_COMPLETE).EndPacket();
+    writer.BeginPacket(NetworkMessageType::ITP_COMMAND_COMPLETE).EndPacket();
   }
 
  private:
-  bool startup_ = true;
   InputPacket curr_input_packet_{};
   std::unordered_map<std::string, std::string> cmdline_options_;
   common::ManagedPointer<ITPCommandFactory> command_factory_;

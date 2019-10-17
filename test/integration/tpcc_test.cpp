@@ -85,9 +85,9 @@ class TPCCTests : public TerrierTest {
     }
 
     if (logging_enabled) {
-      log_manager_ =
-          new storage::LogManager(LOG_FILE_NAME, num_log_buffers_, log_serialization_interval_, log_persist_interval_,
-                                  log_persist_threshold_, &buffer_pool_, common::ManagedPointer(thread_registry_));
+      log_manager_ = new storage::LogManager(LOG_FILE_NAME, num_log_buffers_, log_serialization_interval_,
+                                             log_persist_interval_, log_persist_threshold_, "", 0, &buffer_pool_,
+                                             common::ManagedPointer(thread_registry_));
       log_manager_->Start();
     }
 
