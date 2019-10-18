@@ -21,7 +21,8 @@ NetworkIoWrapper::NetworkIoWrapper(const std::string &ip_address, uint16_t port)
   serv_addr.sin_port = htons(port);
 
   int64_t ret = connect(socket_fd, reinterpret_cast<sockaddr *>(&serv_addr), sizeof(serv_addr));
-  if (ret < 0) NETWORK_LOG_ERROR("Connection Error")
+  // TODO(Gus): we need better exception handling here
+  TERRIER_ASSERT(ret >= 0, "Connection to replica failed");
 
   sock_fd_ = socket_fd;
   in_ = std::make_shared<ReadBuffer>();

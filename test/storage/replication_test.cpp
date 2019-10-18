@@ -5,6 +5,7 @@
 #include "catalog/postgres/pg_namespace.h"
 #include "gtest/gtest.h"
 #include "main/db_main.h"
+#include "network/itp/itp_protocol_interpreter.h"
 #include "storage/garbage_collector_thread.h"
 #include "storage/index/index_builder.h"
 #include "storage/recovery/recovery_manager.h"
@@ -26,12 +27,27 @@
 namespace terrier::storage {
 class ReplicationTests : public TerrierTest {
  protected:
+  // This is an estimate for how long we expect for all the logs to arrive at the replica and be replayed by the
+  // recovery manager. You should be pessimistic in setting this number, be sure it is an overestimate. Each test should
+  // set it to its own value depending on the amount of work it's doing
+  std::chrono::seconds replication_delay_estimate_;
+
   // Settings for log manager
   const uint64_t num_log_buffers_ = 100;
   const std::chrono::microseconds log_serialization_interval_{10};
   const std::chrono::milliseconds log_persist_interval_{20};
   const uint64_t log_persist_threshold_ = (1 << 20);  // 1MB
+  const std::string ip_address_ = "127.0.0.1";
+  const uint16_t replication_port_ = 9022;
 
+  // Settings for server
+  uint32_t max_connections_ = 1;
+  uint32_t conn_backlog_ = 1;
+
+  // Settings for replication
+  const std::chrono::seconds replication_timeout_{10};
+
+  // General settings
   std::default_random_engine generator_;
   storage::RecordBufferSegmentPool buffer_pool_{2000, 100};
   storage::BlockStore block_store_{100, 100};
@@ -39,49 +55,102 @@ class ReplicationTests : public TerrierTest {
   // Settings for gc
   const std::chrono::milliseconds gc_period_{10};
 
-  // Original Components
-  common::DedicatedThreadRegistry *thread_registry_;
-  LogManager *log_manager_;
-  transaction::TimestampManager *timestamp_manager_;
-  transaction::DeferredActionManager *deferred_action_manager_;
-  transaction::TransactionManager *txn_manager_;
-  catalog::Catalog *catalog_;
-  storage::GarbageCollector *gc_;
-  storage::GarbageCollectorThread *gc_thread_;
+  // Master node's components (prefixed with "master_") in order of initialization
+  // We need:
+  //  1. ThreadRegistry
+  //  2. LogManager
+  //  3. TxnManager
+  //  4. Catalog
+  //  4. GC
+  common::DedicatedThreadRegistry *master_thread_registry_;
+  LogManager *master_log_manager_;
+  transaction::TimestampManager *master_timestamp_manager_;
+  transaction::DeferredActionManager *master_deferred_action_manager_;
+  transaction::TransactionManager *master_txn_manager_;
+  catalog::Catalog *master_catalog_;
+  storage::GarbageCollector *master_gc_;
+  storage::GarbageCollectorThread *master_gc_thread_;
 
-  // Recovery Components
-  transaction::TimestampManager *recovery_timestamp_manager_;
-  transaction::DeferredActionManager *recovery_deferred_action_manager_;
-  transaction::TransactionManager *recovery_txn_manager_;
-  catalog::Catalog *recovery_catalog_;
-  storage::GarbageCollector *recovery_gc_;
-  storage::GarbageCollectorThread *recovery_gc_thread_;
+  // Replica node's components (prefixed with "replica_") in order of initialization
+  //  1. Thread Registry
+  //  2. TxnManager
+  //  3. Catalog
+  //  4. GC
+  //  5. RecoveryManager
+  //  6. TrafficCop
+  //  7. TerrierServer
+  common::DedicatedThreadRegistry *replica_thread_registry_;
+  transaction::TimestampManager *replica_timestamp_manager_;
+  transaction::DeferredActionManager *replica_deferred_action_manager_;
+  transaction::TransactionManager *replica_txn_manager_;
+  catalog::Catalog *replica_catalog_;
+  storage::GarbageCollector *replica_gc_;
+  storage::GarbageCollectorThread *replica_gc_thread_;
+  storage::ReplicationLogProvider *replica_log_provider_;
+  storage::RecoveryManager *replica_recovery_manager_;
+  network::ITPCommandFactory *replica_itp_command_factory_;
+  network::ITPProtocolInterpreter::Provider *replica_itp_protocol_provider_;
+  network::ConnectionHandleFactory *replica_connection_handle_factory_;
+  trafficcop::TrafficCop *replica_tcop_;
+  network::TerrierServer *replica_server_;
 
   void SetUp() override {
     TerrierTest::SetUp();
     // Unlink log file incase one exists from previous test iteration
     unlink(LOG_FILE_NAME);
-    thread_registry_ = new common::DedicatedThreadRegistry(DISABLED);
-    log_manager_ =
-        new LogManager(LOG_FILE_NAME, num_log_buffers_, log_serialization_interval_, log_persist_interval_,
-                       log_persist_threshold_, "", 0, &buffer_pool_, common::ManagedPointer(thread_registry_));
-    log_manager_->Start();
-    timestamp_manager_ = new transaction::TimestampManager;
-    deferred_action_manager_ = new transaction::DeferredActionManager(timestamp_manager_);
-    txn_manager_ = new transaction::TransactionManager(timestamp_manager_, deferred_action_manager_, &buffer_pool_,
-                                                       true, log_manager_);
-    catalog_ = new catalog::Catalog(txn_manager_, &block_store_);
-    gc_ = new storage::GarbageCollector(timestamp_manager_, deferred_action_manager_, txn_manager_, DISABLED);
-    gc_thread_ = new storage::GarbageCollectorThread(gc_, gc_period_);  // Enable background GC
 
-    recovery_timestamp_manager_ = new transaction::TimestampManager;
-    recovery_deferred_action_manager_ = new transaction::DeferredActionManager(recovery_timestamp_manager_);
-    recovery_txn_manager_ = new transaction::TransactionManager(
-        recovery_timestamp_manager_, recovery_deferred_action_manager_, &buffer_pool_, true, DISABLED);
-    recovery_catalog_ = new catalog::Catalog(recovery_txn_manager_, &block_store_);
-    recovery_gc_ = new storage::GarbageCollector(recovery_timestamp_manager_, recovery_deferred_action_manager_,
-                                                 recovery_txn_manager_, DISABLED);
-    recovery_gc_thread_ = new storage::GarbageCollectorThread(recovery_gc_, gc_period_);  // Enable background GC
+    // We first bring up the replica, then the master node
+    replica_thread_registry_ = new common::DedicatedThreadRegistry(DISABLED);
+    replica_timestamp_manager_ = new transaction::TimestampManager;
+    replica_deferred_action_manager_ = new transaction::DeferredActionManager(replica_timestamp_manager_);
+    replica_txn_manager_ = new transaction::TransactionManager(
+        replica_timestamp_manager_, replica_deferred_action_manager_, &buffer_pool_, true, DISABLED);
+    replica_catalog_ = new catalog::Catalog(replica_txn_manager_, &block_store_);
+    replica_gc_ = new storage::GarbageCollector(replica_timestamp_manager_, replica_deferred_action_manager_,
+                                                replica_txn_manager_, DISABLED);
+    replica_gc_thread_ = new storage::GarbageCollectorThread(replica_gc_, gc_period_);  // Enable background GC
+
+    // Bring up recovery manager
+    replica_log_provider_ = new ReplicationLogProvider(replication_timeout_);
+    replica_recovery_manager_ = new RecoveryManager(common::ManagedPointer<AbstractLogProvider>(replica_log_provider_),
+                                                    common::ManagedPointer(replica_catalog_), replica_txn_manager_,
+                                                    replica_deferred_action_manager_,
+                                                    common::ManagedPointer(replica_thread_registry_), &block_store_);
+    replica_recovery_manager_->StartRecovery();
+
+    // Bring up network layer
+    replica_itp_command_factory_ = new network::ITPCommandFactory;
+    replica_itp_protocol_provider_ =
+        new network::ITPProtocolInterpreter::Provider(common::ManagedPointer(replica_itp_command_factory_));
+    replica_tcop_ = new trafficcop::TrafficCop(common::ManagedPointer(replica_log_provider_));
+    replica_connection_handle_factory_ = new network::ConnectionHandleFactory(common::ManagedPointer(replica_tcop_));
+    try {
+      replica_server_ = new network::TerrierServer(common::ManagedPointer(replica_connection_handle_factory_),
+                                                   common::ManagedPointer(replica_thread_registry_));
+      replica_server_->RegisterProtocol(
+          replication_port_,
+          common::ManagedPointer<network::ProtocolInterpreter::Provider>(replica_itp_protocol_provider_),
+          max_connections_, conn_backlog_);
+      replica_server_->RunServer();
+    } catch (NetworkProcessException &exception) {
+      TEST_LOG_ERROR("[LaunchServer] exception when launching server");
+      throw;
+    }
+
+    // Bring up components for master node
+    master_thread_registry_ = new common::DedicatedThreadRegistry(DISABLED);
+    master_log_manager_ = new LogManager(LOG_FILE_NAME, num_log_buffers_, log_serialization_interval_,
+                                         log_persist_interval_, log_persist_threshold_, ip_address_, replication_port_,
+                                         &buffer_pool_, common::ManagedPointer(master_thread_registry_));
+    master_log_manager_->Start();
+    master_timestamp_manager_ = new transaction::TimestampManager;
+    master_deferred_action_manager_ = new transaction::DeferredActionManager(master_timestamp_manager_);
+    master_txn_manager_ = new transaction::TransactionManager(
+        master_timestamp_manager_, master_deferred_action_manager_, &buffer_pool_, true, master_log_manager_);
+    master_catalog_ = new catalog::Catalog(master_txn_manager_, &block_store_);
+    master_gc_ = new storage::GarbageCollector(master_timestamp_manager_, master_deferred_action_manager_,
+                                               master_txn_manager_, DISABLED);
+    master_gc_thread_ = new storage::GarbageCollectorThread(master_gc_, gc_period_);  // Enable background GC
   }
 
   void TearDown() override {
@@ -89,32 +158,41 @@ class ReplicationTests : public TerrierTest {
     unlink(LOG_FILE_NAME);
     TerrierTest::TearDown();
 
-    // Destroy recovered catalog if the test has not cleaned it up already
-    if (recovery_catalog_ != nullptr) {
-      recovery_catalog_->TearDown();
-      delete recovery_gc_thread_;
-      StorageTestUtil::FullyPerformGC(recovery_gc_, DISABLED);
-    }
-
     // Destroy original catalog. We need to manually call GC followed by a ForceFlush because catalog deletion can defer
     // events that create new transactions, which then need to be flushed before they can be GC'd.
-    catalog_->TearDown();
-    delete gc_thread_;
-    StorageTestUtil::FullyPerformGC(gc_, log_manager_);
-    log_manager_->PersistAndStop();
+    master_catalog_->TearDown();
+    delete master_gc_thread_;
+    StorageTestUtil::FullyPerformGC(master_gc_, master_log_manager_);
+    master_log_manager_->PersistAndStop();
 
-    delete recovery_gc_;
-    delete recovery_catalog_;
-    delete recovery_txn_manager_;
-    delete recovery_deferred_action_manager_;
-    delete recovery_timestamp_manager_;
-    delete gc_;
-    delete catalog_;
-    delete txn_manager_;
-    delete deferred_action_manager_;
-    delete timestamp_manager_;
-    delete log_manager_;
-    delete thread_registry_;
+    // Delete in reverse order of initialization
+    delete master_gc_;
+    delete master_catalog_;
+    delete master_txn_manager_;
+    delete master_deferred_action_manager_;
+    delete master_timestamp_manager_;
+    delete master_log_manager_;
+    delete master_thread_registry_;
+
+    // Replication should be finished by now, each test should ensure it waits for ample time for everything to
+    // replicate
+    replica_recovery_manager_->WaitForRecoveryToFinish();
+    replica_catalog_->TearDown();
+    delete replica_gc_thread_;
+    StorageTestUtil::FullyPerformGC(replica_gc_, DISABLED);
+
+    delete replica_server_;
+    delete replica_connection_handle_factory_;
+    delete replica_tcop_;
+    delete replica_itp_protocol_provider_;
+    delete replica_itp_command_factory_;
+    delete replica_recovery_manager_;
+    delete replica_log_provider_;
+    delete replica_gc_;
+    delete replica_catalog_;
+    delete replica_txn_manager_;
+    delete replica_deferred_action_manager_;
+    delete replica_timestamp_manager_;
   }
 
   catalog::db_oid_t CreateDatabase(transaction::TransactionContext *txn, catalog::Catalog *catalog,
@@ -123,123 +201,22 @@ class ReplicationTests : public TerrierTest {
     EXPECT_TRUE(db_oid != catalog::INVALID_DATABASE_OID);
     return db_oid;
   }
-
-  // Simulates the system shutting down and restarting
-  void ShutdownAndRestartSystem() {
-    // Simulate the system "shutting down". Guarantee persist of log records
-    delete gc_thread_;
-    StorageTestUtil::FullyPerformGC(gc_, log_manager_);
-    log_manager_->PersistAndStop();
-
-    // We now "boot up" up the system
-    log_manager_->Start();
-    gc_thread_ = new storage::GarbageCollectorThread(gc_, gc_period_);
-  }
 };
 
-// Tests the correctness of the ReplicationLogProvider
-// NOLINTNEXTLINE
-TEST_F(ReplicationTests, ReplicationLogProviderTest) {
-  constexpr uint8_t num_databases = 3;
+TEST_F(ReplicationTests, CreateDatabaseTest) {
   std::string database_name = "testdb";
-  std::vector<catalog::db_oid_t> db_oids;
-  db_oids.reserve(num_databases);
+  // Create a database and commit, we should see this one after replication
+  auto *txn = master_txn_manager_->BeginTransaction();
+  auto db_oid = CreateDatabase(txn, master_catalog_, database_name);
+  master_txn_manager_->Commit(txn, transaction::TransactionUtil::EmptyCallback, nullptr);
 
-  // Create a bunch of databases and commit, we should see this one after recovery
-  auto *txn = txn_manager_->BeginTransaction();
-  for (uint8_t db_idx = 0; db_idx < num_databases; db_idx++) {
-    db_oids.push_back(CreateDatabase(txn, catalog_, database_name + std::to_string(db_idx)));
-  }
-  txn_manager_->Commit(txn, transaction::TransactionUtil::EmptyCallback, nullptr);
+  replication_delay_estimate_ = std::chrono::seconds(2);
+  std::this_thread::sleep_for(replication_delay_estimate_);
 
-  // Simulate the system "shutting down"
-  ShutdownAndRestartSystem();
-
-  // Initialize provider
-  ReplicationLogProvider log_provider(std::chrono::seconds(1));
-
-  // We read the contents into buffers, which we hand off to the replication log provider
-  auto log_file_fd = storage::PosixIoWrappers::Open(LOG_FILE_NAME, O_RDONLY);
-  while (true) {
-    auto buffer = std::make_unique<network::ReadBuffer>();
-    auto bytes_read = buffer->FillBufferFrom(log_file_fd);
-
-    if (bytes_read == 0) {
-      break;
-    } else {
-      log_provider.HandBufferToReplication(std::move(buffer));
-    }
-  }
-
-  RecoveryManager recovery_manager(common::ManagedPointer<storage::AbstractLogProvider>(&log_provider),
-                                   common::ManagedPointer(recovery_catalog_), recovery_txn_manager_,
-                                   recovery_deferred_action_manager_, common::ManagedPointer(thread_registry_),
-                                   &block_store_);
-  recovery_manager.StartRecovery();
-  recovery_manager.WaitForRecoveryToFinish();
-
-  // Assert the database creations we committed exist
-  txn = recovery_txn_manager_->BeginTransaction();
-  for (uint8_t i = 0; i < num_databases; i++) {
-    EXPECT_EQ(db_oids[i], recovery_catalog_->GetDatabaseOid(txn, database_name + std::to_string(i)));
-    EXPECT_TRUE(recovery_catalog_->GetDatabaseCatalog(txn, db_oids[i]));
-  }
-  recovery_txn_manager_->Commit(txn, transaction::TransactionUtil::EmptyCallback, nullptr);
-}
-
-// Tests that recovery is able to process logs that arrive will recovery is happening (similar to an online setting like
-// recovery) warning: This test could fail due to the 3 second timeout in the event of terrible thread scheduling or
-// disk latency. The chance of this happening however is extremely low with a three second timeout.
-// NOLINTNEXTLINE
-TEST_F(ReplicationTests, ConcurrentReplicationLogProviderTest) {
-  constexpr uint8_t num_databases = 5;
-  std::string database_name = "testdb";
-  std::vector<catalog::db_oid_t> db_oids;
-  db_oids.reserve(num_databases);
-
-  // Create a bunch of databases and commit, we should see this one after recovery
-  auto *txn = txn_manager_->BeginTransaction();
-  for (uint8_t db_idx = 0; db_idx < num_databases; db_idx++) {
-    db_oids.push_back(CreateDatabase(txn, catalog_, database_name + std::to_string(db_idx)));
-  }
-  txn_manager_->Commit(txn, transaction::TransactionUtil::EmptyCallback, nullptr);
-
-  // Simulate the system "shutting down"
-  ShutdownAndRestartSystem();
-
-  // Initialize provider
-  ReplicationLogProvider log_provider(std::chrono::seconds(3));
-
-  RecoveryManager recovery_manager(common::ManagedPointer<storage::AbstractLogProvider>(&log_provider),
-                                   common::ManagedPointer(recovery_catalog_), recovery_txn_manager_,
-                                   recovery_deferred_action_manager_, common::ManagedPointer(thread_registry_),
-                                   &block_store_);
-  recovery_manager.StartRecovery();
-
-  // We read the contents into buffers in a background thread to simulate logs arriving while recovery is running.
-  auto reader_thread = std::thread([&]() {
-    auto log_file_fd = storage::PosixIoWrappers::Open(LOG_FILE_NAME, O_RDONLY);
-    while (true) {
-      auto buffer = std::make_unique<network::ReadBuffer>();
-      auto bytes_read = buffer->FillBufferFrom(log_file_fd);
-
-      if (bytes_read == 0) {
-        break;
-      } else {
-        log_provider.HandBufferToReplication(std::move(buffer));
-      }
-    }
-  });
-  reader_thread.join();
-  recovery_manager.WaitForRecoveryToFinish();
-
-  // Assert the database creations we committed exist
-  txn = recovery_txn_manager_->BeginTransaction();
-  for (uint8_t i = 0; i < num_databases; i++) {
-    EXPECT_EQ(db_oids[i], recovery_catalog_->GetDatabaseOid(txn, database_name + std::to_string(i)));
-    EXPECT_TRUE(recovery_catalog_->GetDatabaseCatalog(txn, db_oids[i]));
-  }
-  recovery_txn_manager_->Commit(txn, transaction::TransactionUtil::EmptyCallback, nullptr);
+  txn = replica_txn_manager_->BeginTransaction();
+  EXPECT_EQ(db_oid, replica_catalog_->GetDatabaseOid(txn, database_name));
+  EXPECT_TRUE(replica_catalog_->GetDatabaseCatalog(txn, db_oid));
+  replica_txn_manager_->Commit(txn, transaction::TransactionUtil::EmptyCallback, nullptr);
 }
 
 }  // namespace terrier::storage

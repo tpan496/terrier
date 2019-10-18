@@ -64,6 +64,7 @@ class RecoveryManager : public common::DedicatedThreadOwner {
    * @param thread_registry thread registry to register tasks
    * @param store block store used for SQLTable creation during recovery
    */
+  // TODO(Gus): Should txn manager and DAmanager be managed pointers?
   explicit RecoveryManager(common::ManagedPointer<AbstractLogProvider> log_provider,
                            common::ManagedPointer<catalog::Catalog> catalog,
                            transaction::TransactionManager *txn_manager,

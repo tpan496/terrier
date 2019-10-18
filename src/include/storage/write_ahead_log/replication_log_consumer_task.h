@@ -56,8 +56,13 @@ class ReplicationLogConsumerTask final : public LogConsumerTask {
   void ReplicationLogConsumerTaskLoop();
 
   /**
-   * @brief Sends all serialized logs
+   * @brief Sends all serialized logs to replica(s)
    */
   void SendLogsOverNetwork();
+
+  /**
+   * Sends a stop message to replica(s)
+   */
+  void SendStopReplicationMessage();
 };
 }  // namespace terrier::storage

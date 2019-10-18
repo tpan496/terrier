@@ -11,7 +11,7 @@ namespace terrier::storage {
  * @brief Log provider for logs being received over network
  * Provides logs to the recovery manager from logs being sent by master node over the network
  */
-class ReplicationLogProvider : public AbstractLogProvider {
+class ReplicationLogProvider final : public AbstractLogProvider {
  public:
   ReplicationLogProvider(std::chrono::seconds replication_timeout)
       : replication_active_(true), replication_timeout_(replication_timeout) {}

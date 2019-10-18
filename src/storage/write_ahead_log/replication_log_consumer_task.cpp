@@ -15,6 +15,7 @@ void ReplicationLogConsumerTask::Terminate() {
   TERRIER_ASSERT(run_task_, "Cant terminate a task that isn't running");
   // Signal to terminate and force a flush so task persists before LogManager closes buffers
   run_task_ = false;
+  replication_log_sender_cv_.notify_one();
 }
 
 void ReplicationLogConsumerTask::SendLogsOverNetwork() {
@@ -30,6 +31,7 @@ void ReplicationLogConsumerTask::SendLogsOverNetwork() {
   TERRIER_ASSERT(data_size > 0, "Amount of data to send must be greater than 0");
 
   // Build the packet
+  // TODO(Gus): Consider stashing the packet writer in the class to avoid constant construction/destruction
   network::ITPPacketWriter packet_writer(io_wrapper_->GetWriteQueue());
   packet_writer.BeginReplicationCommand(message_id_++, data_size);
   for (auto *buffer : temp_buffer_queue) {
@@ -40,6 +42,12 @@ void ReplicationLogConsumerTask::SendLogsOverNetwork() {
   packet_writer.EndReplicationCommand();
 
   // Send packet over network
+  io_wrapper_->FlushAllWrites();
+}
+
+void ReplicationLogConsumerTask::SendStopReplicationMessage() {
+  network::ITPPacketWriter packet_writer(io_wrapper_->GetWriteQueue());
+  packet_writer.WriteStopReplicationCommand();
   io_wrapper_->FlushAllWrites();
 }
 
@@ -59,6 +67,8 @@ void ReplicationLogConsumerTask::ReplicationLogConsumerTaskLoop() {
     if (!filled_buffer_queue_->Empty()) SendLogsOverNetwork();
 
   } while (run_task_ || !filled_buffer_queue_->Empty());
+
+  SendStopReplicationMessage();
 }
 
 }  // namespace terrier::storage
