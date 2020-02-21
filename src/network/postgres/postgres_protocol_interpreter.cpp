@@ -8,10 +8,6 @@
 
 #include "network/network_defs.h"
 #include "network/postgres/postgres_network_commands.h"
-#include "network/terrier_server.h"
-
-constexpr uint32_t SSL_MESSAGE_VERNO = 80877103;
-#define PROTO_MAJOR_VERSION(x) ((x) >> 16)
 
 namespace terrier::network {
 Transition PostgresProtocolInterpreter::Process(common::ManagedPointer<ReadBuffer> in,
@@ -71,7 +67,7 @@ Transition PostgresProtocolInterpreter::ProcessStartup(const common::ManagedPoin
       context->CommandLineArgs()[key] = std::move(value);
     }
   }
-  // skip the last nul byte
+  // skip the last null byte
   in->Skip(1);
   // TODO(Tianyu): Implement authentication. For now we always send AuthOK
 
@@ -85,26 +81,27 @@ Transition PostgresProtocolInterpreter::ProcessStartup(const common::ManagedPoin
     }
   }
 
-  std::pair<catalog::db_oid_t, catalog::namespace_oid_t> oids;
-
-  uint32_t sleep_time = INITIAL_BACKOFF_TIME;
-
-  // we loop with exponential backoff because in case there are multiple other pg connections also starting
+  // We loop with exponential backoff because in case there are multiple other connections also starting
   // at the same time, creating DDL conflicts when creating the temp namespace
+  std::pair<catalog::db_oid_t, catalog::namespace_oid_t> oids;
+  uint32_t sleep_time = INITIAL_BACKOFF_TIME;
   do {
     oids = t_cop->CreateTempNamespace(context->GetConnectionID(), db_name);
     if (oids.first == catalog::INVALID_DATABASE_OID || oids.second != catalog::INVALID_NAMESPACE_OID) break;
     std::this_thread::sleep_for(std::chrono::milliseconds{sleep_time});
     sleep_time *= BACKOFF_FACTOR;
+    if (sleep_time > 10) NETWORK_LOG_ERROR("Sleeping for {0} ms [connection={1}]", sleep_time, context->GetConnectionID());
   } while (sleep_time <= MAX_BACKOFF_TIME);
 
   if (oids.first == catalog::INVALID_DATABASE_OID) {
     // Invalid database name
+    NETWORK_LOG_ERROR("Failed to create temporary namespace. This should not happen! [database]");
     // TODO(Matt): need to actually return an error to the client
     return Transition::TERMINATE;
   }
   if (oids.second == catalog::INVALID_NAMESPACE_OID) {
     // Failed to create temporary namespace. Client should retry.
+    NETWORK_LOG_ERROR("Failed to create temporary namespace. This should not happen! [namespace]");
     // TODO(Matt): need to actually return an error to the client
     return Transition::TERMINATE;
   }

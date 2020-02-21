@@ -153,7 +153,7 @@ class NetworkTests : public TerrierTest {
  * Callback method to close server after client finishes
  */
 // NOLINTNEXTLINE
-TEST_F(NetworkTests, SimpleQueryTest) {
+TEST_F(NetworkTests, DISABLED_SimpleQueryTest) {
   try {
     pqxx::connection c(fmt::format("host=127.0.0.1 port={0} user={1} sslmode=disable application_name=psql", port_,
                                    catalog::DEFAULT_DATABASE));
@@ -174,7 +174,7 @@ TEST_F(NetworkTests, SimpleQueryTest) {
 }
 
 // NOLINTNEXTLINE
-TEST_F(NetworkTests, BadQueryTest) {
+TEST_F(NetworkTests, DISABLED_BadQueryTest) {
   try {
     NETWORK_LOG_INFO("[BadQueryTest] Starting, expect errors to be logged");
     auto io_socket_unique_ptr = network::ManualPacketUtil::StartConnection(port_);
@@ -205,7 +205,7 @@ TEST_F(NetworkTests, BadQueryTest) {
 }
 
 // NOLINTNEXTLINE
-TEST_F(NetworkTests, NoSSLTest) {
+TEST_F(NetworkTests, DISABLED_NoSSLTest) {
   try {
     pqxx::connection c(fmt::format("host=127.0.0.1 port={0} user={1} sslmode=disable application_name=psql", port_,
                                    catalog::DEFAULT_DATABASE));
@@ -221,7 +221,7 @@ TEST_F(NetworkTests, NoSSLTest) {
 }
 
 // NOLINTNEXTLINE
-TEST_F(NetworkTests, PgNetworkCommandsTest) {
+TEST_F(NetworkTests, DISABLED_PgNetworkCommandsTest) {
   try {
     TestExtendedQuery(port_);
   } catch (const std::exception &e) {
@@ -231,7 +231,7 @@ TEST_F(NetworkTests, PgNetworkCommandsTest) {
 }
 
 // NOLINTNEXTLINE
-TEST_F(NetworkTests, LargePacketsTest) {
+TEST_F(NetworkTests, DISABLED_LargePacketsTest) {
   try {
     pqxx::connection c(fmt::format("host=127.0.0.1 port={0} user={1} sslmode=disable application_name=psql", port_,
                                    catalog::DEFAULT_DATABASE));
@@ -252,7 +252,7 @@ TEST_F(NetworkTests, LargePacketsTest) {
  * on multiple synchronous clients in two batches
  */
 // NOLINTNEXTLINE
-TEST_F(NetworkTests, MultipleConnectionTest) {
+TEST_F(NetworkTests, DISABLED_MultipleConnectionTest) {
   std::vector<std::unique_ptr<NetworkIoWrapper>> io_sockets;
   io_sockets.reserve(CONNECTION_THREAD_COUNT * 2);
 
@@ -294,7 +294,7 @@ TEST_F(NetworkTests, RacerTest) {
   for (auto num_threads : thread_counts) {
     std::vector<std::thread> threads;
     threads.reserve(num_threads);
-    NETWORK_LOG_INFO("Number of threads: {0}", num_threads);
+    NETWORK_LOG_DEBUG("Number of threads: {0}", num_threads);
 
     std::atomic_int successes = 0;
     for (size_t i = 0; i < num_threads; i++) {
@@ -329,7 +329,7 @@ TEST_F(NetworkTests, RacerTest) {
  * The test is so named because it fixed a bug that Gus was seeing in trying to replicate TPC-C across the network.
  */
 // NOLINTNEXTLINE
-TEST_F(NetworkTests, GusThesisSaver) {
+TEST_F(NetworkTests, DISABLED_GusThesisSaver) {
   try {
     NETWORK_LOG_INFO("[GusThesisSaver] Starting, expect errors to be logged");
     auto io_socket_unique_ptr = network::ManualPacketUtil::StartConnection(port_);

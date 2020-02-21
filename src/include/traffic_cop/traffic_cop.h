@@ -62,7 +62,8 @@ class TrafficCop {
   void HandBufferToReplication(std::unique_ptr<network::ReadBuffer> buffer);
 
   /**
-   * Create a temporary namespace for a connection
+   * Create a temporary namespace for a connection. This will create an internal
+   * transaction that updates the catalog to install the new namespace.
    * @param connection_id the unique connection ID to use for the namespace name
    * @param database_name the name of the database the connection is accessing
    * @return a pair of OIDs for the database and the temporary namespace
