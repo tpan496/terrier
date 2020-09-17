@@ -16,6 +16,7 @@
 #include "settings/settings_manager.h"
 #include "settings/settings_param.h"
 #include "storage/garbage_collector_thread.h"
+#include "storage/replication/replication_manager.h"
 #include "transaction/deferred_action_manager.h"
 #include "transaction/transaction_manager.h"
 
@@ -364,6 +365,11 @@ class DBMain {
                                            network_port_, connection_thread_count_, uds_file_directory_);
       }
 
+      std::unique_ptr<storage::ReplicationManager> replication_manager = DISABLED;
+      if (use_replication_) {
+        replication_manager = std::make_unique<storage::ReplicationManager>(replica_config_);
+      }
+
       db_main->settings_manager_ = std::move(settings_manager);
       db_main->metrics_manager_ = std::move(metrics_manager);
       db_main->metrics_thread_ = std::move(metrics_thread);
@@ -378,6 +384,7 @@ class DBMain {
       db_main->execution_layer_ = std::move(execution_layer);
       db_main->traffic_cop_ = std::move(traffic_cop);
       db_main->network_layer_ = std::move(network_layer);
+      db_main->replication_manager_ = std::move(replication_manager);
 
       return db_main;
     }
@@ -625,6 +632,15 @@ class DBMain {
       return *this;
     }
 
+    /**
+     * @param value use component
+     * @return self reference for chaining
+     */
+    Builder &SetUseReplication(const bool value) {
+      use_replication_ = value;
+      return *this;
+    }
+
    private:
     std::unordered_map<settings::Param, settings::ParamInfo> param_map_;
 
@@ -667,6 +683,8 @@ class DBMain {
     std::string uds_file_directory_ = "/tmp/";
     uint16_t connection_thread_count_ = 4;
     bool use_network_ = false;
+    bool use_replication_ = false;
+    std::string replica_config_ = "/replica.conf";
 
     /**
      * Instantiates the SettingsManager and reads all of the settings to override the Builder's settings.
@@ -715,6 +733,8 @@ class DBMain {
       metrics_gc_ = settings_manager->GetBool(settings::Param::metrics_gc);
       metrics_bind_command_ = settings_manager->GetBool(settings::Param::metrics_bind_command);
       metrics_execute_command_ = settings_manager->GetBool(settings::Param::metrics_execute_command);
+
+      replica_config_ = settings_manager->GetString(settings::Param::pg_host);
 
       return settings_manager;
     }
@@ -820,6 +840,11 @@ class DBMain {
    */
   common::ManagedPointer<ExecutionLayer> GetExecutionLayer() const { return common::ManagedPointer(execution_layer_); }
 
+  /**
+   * @return ManagedPointer to the component, can be nullptr if disabled
+   */
+  common::ManagedPointer<ReplicationManager> GetReplicationManager() const { return common::ManagedPointer(replication_manager_); }
+
  private:
   // Order matters here for destruction order
   std::unique_ptr<settings::SettingsManager> settings_manager_;
@@ -837,6 +862,7 @@ class DBMain {
   std::unique_ptr<ExecutionLayer> execution_layer_;
   std::unique_ptr<trafficcop::TrafficCop> traffic_cop_;
   std::unique_ptr<NetworkLayer> network_layer_;
+  std::unique_ptr<storage::ReplicationManager> replication_manager_;
 };
 
 }  // namespace terrier
