@@ -15,6 +15,12 @@ class ReplicationManager {
     }
   }
 
+  void ToJson() {
+
+  }
+
 private:
   std::string replica_address;
+
+  // Some form of messenger here.
 };
