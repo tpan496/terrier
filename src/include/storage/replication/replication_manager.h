@@ -27,6 +27,7 @@ public:
     replication_consumer_queue_->Enqueue(std::make_pair(network_buffer, std::vector<CommitCallback>()));
   }
 
+  // Depletes buffer log and serialize to json.
   nlohmann::json Serialize() {
     // Grab buffers in queue
     std::deque<BufferedLogWriter *> temp_buffer_queue;
@@ -55,6 +56,15 @@ public:
     j["content"] = content;
 
     return j;
+  }
+
+  // Fills content of message into buffer.
+  void Deserialize(nlohmann::json message, std::unique_ptr<network::ReadBuffer> buffer) {
+    size_t size = message["size"];
+    std::string content = message["content"];
+    std::vector<unsigned char> content_buffer(content.begin(), content.end());
+    network::ReadBufferView view(size, content_buffer.begin());
+    buffer->FillBufferFrom(view, size);
   }
 
 private:
