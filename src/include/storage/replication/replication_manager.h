@@ -23,18 +23,11 @@ public:
     }
   }
 
-  // Continuously write messages to replica.
-  void WriterLoop() {
-    while(true) {
-
-    }
-  }
-
   void AddRecordBuffer(BufferedLogWriter *network_buffer) {
     replication_consumer_queue_->Enqueue(std::make_pair(network_buffer, std::vector<CommitCallback>()));
   }
 
-  void SendLogsOverNetwork() {
+  nlohmann::json Serialize() {
     // Grab buffers in queue
     std::deque<BufferedLogWriter *> temp_buffer_queue;
     uint64_t data_size = 0;
@@ -46,7 +39,7 @@ public:
     }
     TERRIER_ASSERT(data_size > 0, "Amount of data to send must be greater than 0");
 
-    // Build JSON
+    // Build JSON object.
     nlohmann::json j;
     j["type"] = "itp";
 
@@ -61,14 +54,12 @@ public:
     j["size"] = size;
     j["content"] = content;
 
-    // Send Json through messenger
+    return j;
   }
 
 private:
   std::string replica_address;
   common::ConcurrentQueue<SerializedLogs> *replication_consumer_queue_;
-
-  // Some form of messenger here.
   messenger::Messenger messenger_;
 };
 
