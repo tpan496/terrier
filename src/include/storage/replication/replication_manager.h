@@ -2,6 +2,7 @@
 
 #include <fstream>
 #include <common/container/concurrent_queue.h>
+#include <storage/recovery/replication_log_provider.h>
 #include "common/json.h"
 #include "loggers/storage_logger.h"
 #include "storage/write_ahead_log/log_io.h"
@@ -13,7 +14,7 @@ namespace terrier::storage {
 class ReplicationManager {
 public:
   // Each line in the config file should be formatted as ip:port.
-  ReplicationManager(common::ManagedPointer<messenger::MessengerLogic> messenger_logic, const std::string& config_path) : messenger_(messenger_logic) {
+  ReplicationManager(common::ManagedPointer<messenger::MessengerLogic> messenger_logic, const std::string& config_path, common::ManagedPointer<storage::ReplicationLogProvider> provider) : messenger_(messenger_logic), provider_(provider) {
     // Read from config file.
     std::ifstream replica_config(config_path);
     if (replica_config.is_open()) {
@@ -59,7 +60,7 @@ public:
   }
 
   // Fills content of message into buffer.
-  void Deserialize(nlohmann::json message, std::unique_ptr<network::ReadBuffer> buffer) {
+  void Deserialize(nlohmann::json message, std::unique_ptr<network::ReadBuffer>& buffer) {
     size_t size = message["size"];
     std::string content = message["content"];
     std::vector<unsigned char> content_buffer(content.begin(), content.end());
@@ -67,10 +68,23 @@ public:
     buffer->FillBufferFrom(view, size);
   }
 
+  void SendMessage() {
+    Serialize();
+    // Send using messenger.
+  }
+
+  void RecvMessageAndRecover(nlohmann::json message) {
+    size_t size = message["size"];
+    std::unique_ptr<network::ReadBuffer> buffer(new network::ReadBuffer(size));
+    Deserialize(message, buffer);
+    provider_->HandBufferToReplication(buffer);
+  }
+
 private:
   std::string replica_address;
   common::ConcurrentQueue<SerializedLogs> *replication_consumer_queue_;
   messenger::Messenger messenger_;
+  common::ManagedPointer<storage::ReplicationLogProvider> provider_;
 };
 
 }  // namespace terrier::storage;
