@@ -1,17 +1,19 @@
 #pragma once
 
+#include <fstream>
 #include <common/container/concurrent_queue.h>
 #include "common/json.h"
 #include "loggers/storage_logger.h"
 #include "storage/write_ahead_log/log_io.h"
 #include "storage/write_ahead_log/log_record.h"
+#include "messenger/messenger.h"
 
 namespace terrier::storage {
 
 class ReplicationManager {
 public:
   // Each line in the config file should be formatted as ip:port.
-  ReplicationManager(const std::string& config_path) {
+  ReplicationManager(common::ManagedPointer<messenger::MessengerLogic> messenger_logic, const std::string& config_path) : messenger_(messenger_logic) {
     // Read from config file.
     std::ifstream replica_config(config_path);
     if (replica_config.is_open()) {
@@ -67,7 +69,7 @@ private:
   common::ConcurrentQueue<SerializedLogs> *replication_consumer_queue_;
 
   // Some form of messenger here.
-  // Messenger messenger;
+  messenger::Messenger messenger_;
 };
 
 }  // namespace terrier::storage;

@@ -16,6 +16,7 @@
 #include "storage/record_buffer.h"
 #include "storage/write_ahead_log/log_io.h"
 #include "storage/write_ahead_log/log_record.h"
+#include "storage/replication/replication_manager.h"
 
 namespace terrier::storage {
 
@@ -66,7 +67,7 @@ class LogManager : public common::DedicatedThreadOwner {
         serialization_interval_(serialization_interval),
         persist_interval_(persist_interval),
         persist_threshold_(persist_threshold),
-        replication_manager_(DISABLED) {}
+        replication_manager_(DISABLED, "") {}
   /**
    * Starts log manager. Does the following in order:
    *    1. Initialize buffers to pass serialized logs to log consumers
@@ -162,7 +163,7 @@ class LogManager : public common::DedicatedThreadOwner {
   // Threshold used by disk consumer task
   uint64_t persist_threshold_;
   // Replication manager
-  ReplicationManager replication_manager_;
+  storage::ReplicationManager replication_manager_;
 
   /**
    * If the central registry wants to removes our thread used for the disk log consumer task, we only allow removal if
