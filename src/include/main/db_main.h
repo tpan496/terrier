@@ -8,6 +8,7 @@
 #include "catalog/catalog.h"
 #include "common/action_context.h"
 #include "common/managed_pointer.h"
+#include "messenger/messenger.h"
 #include "metrics/metrics_thread.h"
 #include "network/postgres/postgres_command_factory.h"
 #include "network/postgres/postgres_protocol_interpreter.h"
@@ -267,6 +268,18 @@ class DBMain {
     ~ExecutionLayer();
   };
 
+  /** Hopping on the bandwagon. TODO(WAN): better comment. */
+  class MessengerLayer {
+   public:
+    explicit MessengerLayer(const common::ManagedPointer<common::DedicatedThreadRegistry> thread_registry)
+        : messenger_owner_(std::make_unique<messenger::MessengerOwner>(thread_registry)) {}
+
+    ~MessengerLayer() = default;
+
+   private:
+    std::unique_ptr<messenger::MessengerOwner> messenger_owner_;
+  };
+
   /**
    * Creates DBMain objects
    */
@@ -368,6 +381,10 @@ class DBMain {
       std::unique_ptr<storage::ReplicationManager> replication_manager = DISABLED;
       if (use_replication_) {
         replication_manager = std::make_unique<storage::ReplicationManager>(replica_config_);
+
+      std::unique_ptr<MessengerLayer> messenger_layer = DISABLED;
+      if (use_messenger_) {
+        messenger_layer = std::make_unique<MessengerLayer>(common::ManagedPointer(thread_registry));
       }
 
       db_main->settings_manager_ = std::move(settings_manager);
@@ -384,7 +401,11 @@ class DBMain {
       db_main->execution_layer_ = std::move(execution_layer);
       db_main->traffic_cop_ = std::move(traffic_cop);
       db_main->network_layer_ = std::move(network_layer);
+<<<<<<< HEAD
       db_main->replication_manager_ = std::move(replication_manager);
+=======
+      db_main->messenger_layer_ = std::move(messenger_layer);
+>>>>>>> 0d94ec07ec049068087a689bbb531f2645c10526
 
       return db_main;
     }
@@ -552,6 +573,15 @@ class DBMain {
     }
 
     /**
+     * @param value use component
+     * @return self reference for chaining
+     */
+    Builder &SetUseMessenger(const bool value) {
+      use_messenger_ = value;
+      return *this;
+    }
+
+    /**
      * @param port Network port
      * @return self reference for chaining
      */
@@ -683,8 +713,12 @@ class DBMain {
     std::string uds_file_directory_ = "/tmp/";
     uint16_t connection_thread_count_ = 4;
     bool use_network_ = false;
+<<<<<<< HEAD
     bool use_replication_ = false;
     std::string replica_config_ = "/replica.conf";
+=======
+    bool use_messenger_ = false;
+>>>>>>> 0d94ec07ec049068087a689bbb531f2645c10526
 
     /**
      * Instantiates the SettingsManager and reads all of the settings to override the Builder's settings.
@@ -845,6 +879,9 @@ class DBMain {
    */
   common::ManagedPointer<ReplicationManager> GetReplicationManager() const { return common::ManagedPointer(replication_manager_); }
 
+  /** @return ManagedPointer to the MessengerLayer, can be nullptr if disabled. */
+  common::ManagedPointer<MessengerLayer> GetMessengerLayer() const { return common::ManagedPointer(messenger_layer_); }
+
  private:
   // Order matters here for destruction order
   std::unique_ptr<settings::SettingsManager> settings_manager_;
@@ -863,6 +900,7 @@ class DBMain {
   std::unique_ptr<trafficcop::TrafficCop> traffic_cop_;
   std::unique_ptr<NetworkLayer> network_layer_;
   std::unique_ptr<storage::ReplicationManager> replication_manager_;
+  std::unique_ptr<MessengerLayer> messenger_layer_;
 };
 
 }  // namespace terrier
