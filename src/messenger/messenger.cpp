@@ -174,7 +174,8 @@ ConnectionId::ConnectionId(common::ManagedPointer<zmq::context_t> zmq_ctx, const
 
 ConnectionId::~ConnectionId() = default;
 
-Messenger::Messenger(common::ManagedPointer<MessengerLogic> messenger_logic, std::string tcp) : messenger_logic_(messenger_logic) {
+Messenger::Messenger(common::ManagedPointer<MessengerLogic> messenger_logic, std::string tcp_address) : messenger_logic_(messenger_logic) {
+  MESSENGER_LOG_ERROR(tcp_address);
   // Create a ZMQ context. A ZMQ context abstracts away all of the in-process and networked sockets that ZMQ uses.
   // The ZMQ context is also the transport for in-process ("inproc") sockets.
   // Generally speaking, a single process should only have a single ZMQ context.
@@ -190,10 +191,9 @@ Messenger::Messenger(common::ManagedPointer<MessengerLogic> messenger_logic, std
 
   // Bind the same ZeroMQ socket over the default TCP, IPC, and in-process channels.
   {
-    //zmq_default_socket_->bind(MESSENGER_DEFAULT_TCP);
-    zmq_default_socket_->bind(tcp);
-    zmq_default_socket_->bind(MESSENGER_DEFAULT_IPC);
-    zmq_default_socket_->bind(MESSENGER_DEFAULT_INPROC);
+    zmq_default_socket_->bind(tcp_address);
+    //zmq_default_socket_->bind(MESSENGER_DEFAULT_IPC);
+    //zmq_default_socket_->bind(MESSENGER_DEFAULT_INPROC);
   }
 
   // The following block of code is dead code that contains useful background information on ZMQ defaults.
@@ -250,9 +250,9 @@ void Messenger::ServerLoop() {
   }
 }
 
-MessengerOwner::MessengerOwner(const common::ManagedPointer<common::DedicatedThreadRegistry> thread_registry)
+MessengerOwner::MessengerOwner(const common::ManagedPointer<common::DedicatedThreadRegistry> thread_registry, std::string tcp_address)
     : DedicatedThreadOwner(thread_registry),
       logic_(),
-      messenger_(thread_registry_->RegisterDedicatedThread<Messenger>(this, common::ManagedPointer(&logic_))) {}
+      messenger_(thread_registry_->RegisterDedicatedThread<Messenger>(this, common::ManagedPointer(&logic_), tcp_address)) {}
 
 }  // namespace terrier::messenger

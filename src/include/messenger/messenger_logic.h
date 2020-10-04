@@ -16,6 +16,7 @@ enum Callbacks : uint8_t { NOOP = 'N', PRINT = 'P' };
 /** MessengerLogic handles the actual work of processing messages, invoking other system components, etc. */
 class MessengerLogic {
  public:
+  std::string tcp_address = "tcp://*:9022";
   void ProcessMessage(std::string_view sender, std::string_view message);
 
  private:

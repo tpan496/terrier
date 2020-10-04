@@ -56,7 +56,7 @@ class Messenger : public common::DedicatedThreadTask {
    * Create a new Messenger that uses the given logic layer.
    * @param messenger_logic The logic layer of the messenger.
    */
-  explicit Messenger(common::ManagedPointer<MessengerLogic> messenger_logic, std::string tcp);
+  explicit Messenger(common::ManagedPointer<MessengerLogic> messenger_logic, std::string tcp_address);
 
   /** An explicit destructor is necessary because of the unique_ptr around a forward-declared type. */
   ~Messenger();
@@ -129,7 +129,7 @@ class MessengerOwner : public common::DedicatedThreadOwner {
    * Create and run a new Messenger (which is a DedicatedThreadTask) on the specified thread registry.
    * @param thread_registry The registry in which the Messenger will be registered.
    */
-  explicit MessengerOwner(const common::ManagedPointer<common::DedicatedThreadRegistry> thread_registry);
+  explicit MessengerOwner(const common::ManagedPointer<common::DedicatedThreadRegistry> thread_registry, std::string tcp_address);
 
   /** @return The owned messenger. */
   common::ManagedPointer<Messenger> GetMessenger() const { return messenger_; }

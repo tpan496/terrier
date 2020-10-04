@@ -15,7 +15,7 @@ namespace terrier::storage {
 class ReplicationManager {
 public:
   // Each line in the config file should be formatted as ip:port.
-  ReplicationManager(common::ManagedPointer<messenger::MessengerLogic> messenger_logic, const std::string& config_path) : messenger_(messenger_logic) {
+  ReplicationManager(common::ManagedPointer<messenger::MessengerLogic> messenger_logic, const std::string& config_path) : messenger_(messenger_logic, "") {
     // Read from config file.
     std::ifstream replica_config(config_path);
     if (replica_config.is_open()) {

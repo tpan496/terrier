@@ -273,8 +273,8 @@ class DBMain {
   /** Hopping on the bandwagon. TODO(WAN): better comment. */
   class MessengerLayer {
    public:
-    explicit MessengerLayer(const common::ManagedPointer<common::DedicatedThreadRegistry> thread_registry)
-        : messenger_owner_(std::make_unique<messenger::MessengerOwner>(thread_registry)) {}
+    explicit MessengerLayer(const common::ManagedPointer<common::DedicatedThreadRegistry> thread_registry, std::string tcp_address)
+        : messenger_owner_(std::make_unique<messenger::MessengerOwner>(thread_registry, tcp_address)) {}
 
     ~MessengerLayer() = default;
 
@@ -381,7 +381,7 @@ class DBMain {
 
       std::unique_ptr<MessengerLayer> messenger_layer = DISABLED;
       if (use_messenger_) {
-        messenger_layer = std::make_unique<MessengerLayer>(common::ManagedPointer(thread_registry));
+        messenger_layer = std::make_unique<MessengerLayer>(common::ManagedPointer(thread_registry), replica_tcp_address_);
       }
 
       db_main->settings_manager_ = std::move(settings_manager);
@@ -655,6 +655,11 @@ class DBMain {
       return *this;
     }
 
+    Builder &SetReplicaTCPAddress(const std::string value) {
+      replica_tcp_address_ = value;
+      return *this;
+    }
+
    private:
     std::unordered_map<settings::Param, settings::ParamInfo> param_map_;
 
@@ -699,6 +704,7 @@ class DBMain {
     uint16_t connection_thread_count_ = 4;
     bool use_network_ = false;
     bool use_messenger_ = true;
+    std::string replica_tcp_address_ = "tcp://*:9022";
 
     /**
      * Instantiates the SettingsManager and reads all of the settings to override the Builder's settings.
