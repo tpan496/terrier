@@ -149,6 +149,14 @@ class BufferedLogWriter {
    */
   bool IsBufferFull() { return buffer_size_ == common::Constants::LOG_BUFFER_SIZE; }
 
+  uint32_t GetBufferSize() const {
+    return buffer_size_;
+  }
+
+  std::string GetBuffer() const {
+    return std::string(buffer_);
+  }
+
  private:
   int out_;  // fd of the output files
   char buffer_[common::Constants::LOG_BUFFER_SIZE];

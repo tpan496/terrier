@@ -118,10 +118,8 @@ class ZmqUtil {
 
   /** @return The routing ID of the socket. */
   static std::string GetRoutingId(common::ManagedPointer<zmq::socket_t> socket) {
-    char buf[MAX_ROUTING_ID_LEN];
-    size_t routing_id_len = MAX_ROUTING_ID_LEN;
-    socket->getsockopt(ZMQ_ROUTING_ID, &buf, &routing_id_len);
-    return std::string(buf, routing_id_len);
+    auto buf = socket->get(zmq::sockopt::routing_id);
+    return buf;
   }
 
   /** @return The next string to be read off the socket. */
@@ -168,7 +166,7 @@ ConnectionId::ConnectionId(common::ManagedPointer<zmq::context_t> zmq_ctx, const
                            std::string_view identity) {
   // Create a new DEALER socket and connect to the server.
   socket_ = std::make_unique<zmq::socket_t>(*zmq_ctx, ZMQ_DEALER);
-  socket_->setsockopt(ZMQ_ROUTING_ID, identity.data(), identity.size());
+  socket_->set(zmq::sockopt::routing_id, identity);
   routing_id_ = ZmqUtil::GetRoutingId(common::ManagedPointer(socket_));
 
   socket_->connect(target.GetDestination());
@@ -176,7 +174,7 @@ ConnectionId::ConnectionId(common::ManagedPointer<zmq::context_t> zmq_ctx, const
 
 ConnectionId::~ConnectionId() = default;
 
-Messenger::Messenger(common::ManagedPointer<MessengerLogic> messenger_logic) : messenger_logic_(messenger_logic) {
+Messenger::Messenger(common::ManagedPointer<MessengerLogic> messenger_logic, std::string tcp) : messenger_logic_(messenger_logic) {
   // Create a ZMQ context. A ZMQ context abstracts away all of the in-process and networked sockets that ZMQ uses.
   // The ZMQ context is also the transport for in-process ("inproc") sockets.
   // Generally speaking, a single process should only have a single ZMQ context.
@@ -188,11 +186,12 @@ Messenger::Messenger(common::ManagedPointer<MessengerLogic> messenger_logic) : m
   zmq_default_socket_ = std::make_unique<zmq::socket_t>(*zmq_ctx_, ZMQ_ROUTER);
   // By default, the ROUTER socket silently discards messages that cannot be routed.
   // By setting ZMQ_ROUTER_MANDATORY, the ROUTER socket errors with EHOSTUNREACH instead.
-  zmq_default_socket_->setsockopt(ZMQ_ROUTER_MANDATORY, 1);
+  zmq_default_socket_->set(zmq::sockopt::router_mandatory, 1);
 
   // Bind the same ZeroMQ socket over the default TCP, IPC, and in-process channels.
   {
-    zmq_default_socket_->bind(MESSENGER_DEFAULT_TCP);
+    //zmq_default_socket_->bind(MESSENGER_DEFAULT_TCP);
+    zmq_default_socket_->bind(tcp);
     zmq_default_socket_->bind(MESSENGER_DEFAULT_IPC);
     zmq_default_socket_->bind(MESSENGER_DEFAULT_INPROC);
   }
@@ -236,6 +235,7 @@ void Messenger::SendMessage(common::ManagedPointer<ConnectionId> connection_id, 
 
 void Messenger::ServerLoop() {
   common::ManagedPointer<zmq::socket_t> socket{zmq_default_socket_};
+  MESSENGER_LOG_ERROR("Running server loop", messenger_running_);
 
   while (messenger_running_) {
     ZmqMessage msg = ZmqUtil::RecvMsg(socket);
@@ -245,7 +245,8 @@ void Messenger::ServerLoop() {
     reply.identity_ = msg.identity_;
     reply.payload_ = "pong";
     ZmqUtil::SendMsg(socket, reply);
-    MESSENGER_LOG_INFO("SEND \"{}\": \"{}\"", reply.identity_, reply.payload_);
+    //MESSENGER_LOG_INFO("SEND \"{}\": \"{}\"", reply.identity_, reply.payload_);
+    MESSENGER_LOG_ERROR("SEND \"{}\": \"{}\" \"{}\"", reply.identity_, reply.payload_, msg.payload_);
   }
 }
 

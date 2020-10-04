@@ -278,7 +278,6 @@ class DBMain {
 
     ~MessengerLayer() = default;
 
-   private:
     std::unique_ptr<messenger::MessengerOwner> messenger_owner_;
   };
 
@@ -699,7 +698,7 @@ class DBMain {
     std::string uds_file_directory_ = "/tmp/";
     uint16_t connection_thread_count_ = 4;
     bool use_network_ = false;
-    bool use_messenger_ = false;
+    bool use_messenger_ = true;
 
     /**
      * Instantiates the SettingsManager and reads all of the settings to override the Builder's settings.

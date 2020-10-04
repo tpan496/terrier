@@ -7,7 +7,7 @@
 namespace terrier::messenger {
 
 void MessengerLogic::ProcessMessage(std::string_view sender, std::string_view message) {
-  TERRIER_ASSERT(!message.empty(), "Empty messages are currently forbidden. Is there a use case for this?");
+  //TERRIER_ASSERT(!message.empty(), "Empty messages are currently forbidden. Is there a use case for this?");
 
   // TODO(WAN): Document protocol.
   // Process the message.

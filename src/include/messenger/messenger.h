@@ -56,7 +56,7 @@ class Messenger : public common::DedicatedThreadTask {
    * Create a new Messenger that uses the given logic layer.
    * @param messenger_logic The logic layer of the messenger.
    */
-  explicit Messenger(common::ManagedPointer<MessengerLogic> messenger_logic);
+  explicit Messenger(common::ManagedPointer<MessengerLogic> messenger_logic, std::string tcp);
 
   /** An explicit destructor is necessary because of the unique_ptr around a forward-declared type. */
   ~Messenger();
