@@ -59,7 +59,7 @@ namespace terrier::storage {
           .SetUseGC(true)
           .SetUseGCThread(true)
           .SetUseCatalog(true)
-          .SetReplicaTCPAddress("tcp://*:9022")
+          .SetReplicaTCPAddress("tcp://localhost:9022")
           .Build();
       master_txn_manager_ = master_db_main_->GetTransactionLayer()->GetTransactionManager();
       master_log_manager_ = master_db_main_->GetLogManager();
@@ -73,7 +73,7 @@ namespace terrier::storage {
           .SetUseGCThread(true)
           .SetUseCatalog(true)
           .SetCreateDefaultDatabase(false)
-          .SetReplicaTCPAddress("tcp://*:9023")
+          .SetReplicaTCPAddress("tcp://localhost:9023")
           .Build();
       replica_txn_manager_ = replica_db_main_->GetTransactionLayer()->GetTransactionManager();
       replica_deferred_action_manager_ = replica_db_main_->GetTransactionLayer()->GetDeferredActionManager();
@@ -94,11 +94,9 @@ namespace terrier::storage {
     STORAGE_LOG_ERROR("start");
 
     common::ManagedPointer<messenger::MessengerLogic> logic{new messenger::MessengerLogic()};
-    auto master_destination = messenger::ConnectionDestination::MakeTCP("127.0.0.1", 9023);
-    //master_messenger_ = common::ManagedPointer{new messenger::Messenger(logic)};
+    auto master_destination = messenger::ConnectionDestination::MakeTCP("localhost", 9023);
     master_messenger_->ListenForConnection(master_destination);
-    auto replica_destination = messenger::ConnectionDestination::MakeTCP("127.0.0.1", 9022);
-    //replica_messenger_ = common::ManagedPointer{new messenger::Messenger(logic)};
+    auto replica_destination = messenger::ConnectionDestination::MakeTCP("localhost", 9022);
     replica_messenger_->ListenForConnection(replica_destination);
 
     auto replica_conn = master_messenger_->MakeConnection(replica_destination, "your master");

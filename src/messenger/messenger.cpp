@@ -175,7 +175,6 @@ ConnectionId::ConnectionId(common::ManagedPointer<zmq::context_t> zmq_ctx, const
 ConnectionId::~ConnectionId() = default;
 
 Messenger::Messenger(common::ManagedPointer<MessengerLogic> messenger_logic, std::string tcp_address) : messenger_logic_(messenger_logic) {
-  MESSENGER_LOG_ERROR(tcp_address);
   // Create a ZMQ context. A ZMQ context abstracts away all of the in-process and networked sockets that ZMQ uses.
   // The ZMQ context is also the transport for in-process ("inproc") sockets.
   // Generally speaking, a single process should only have a single ZMQ context.

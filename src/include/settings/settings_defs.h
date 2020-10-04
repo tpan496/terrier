@@ -276,3 +276,11 @@ SETTING_string(
     true,
     terrier::settings::Callbacks::NoOp
 )
+
+SETTING_string(
+    pg_host,
+    "Ip address and port for replica (default: replica.conf)",
+    "replica.conf",
+    true,
+    terrier::settings::Callbacks::NoOp
+)

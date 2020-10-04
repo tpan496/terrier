@@ -19,7 +19,8 @@ public:
     // Read from config file.
     std::ifstream replica_config(config_path);
     if (replica_config.is_open()) {
-      std::getline(replica_config, replica_address);
+      std::getline(replica_config, master_address_);
+      std::getline(replica_config, replica_address_);
     } else {
       STORAGE_LOG_ERROR("Replica config file is missing.");
     }
@@ -82,7 +83,8 @@ public:
   }
 
 private:
-  std::string replica_address;
+  std::string master_address_;
+  std::string replica_address_;
   common::ConcurrentQueue<SerializedLogs> *replication_consumer_queue_;
   messenger::Messenger messenger_;
   //common::ManagedPointer<storage::ReplicationLogProvider> provider_;
