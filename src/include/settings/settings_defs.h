@@ -206,6 +206,14 @@ SETTING_bool(
 )
 
 SETTING_bool(
+    metrics_query_trace,
+    "Metrics collection for Query Traces (default: false).",
+    false,
+    true,
+    terrier::settings::Callbacks::MetricsQueryTrace
+)
+
+SETTING_bool(
     metrics_execution,
     "Metrics collection for the Execution component (default: false).",
     false,
@@ -265,6 +273,14 @@ SETTING_string(
     transaction_isolation,
     "The default isolation level (default: TRANSACTION_READ_COMMITTED)",
     "TRANSACTION_READ_COMMITTED",
+    true,
+    terrier::settings::Callbacks::NoOp
+)
+
+SETTING_string(
+    pg_host,
+    "Ip address and port for replica (default: replica.conf)",
+    "replica.conf",
     true,
     terrier::settings::Callbacks::NoOp
 )

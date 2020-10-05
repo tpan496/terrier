@@ -7,8 +7,11 @@
 
 #include "catalog/catalog.h"
 #include "common/action_context.h"
+#include "common/dedicated_thread_registry.h"
 #include "common/managed_pointer.h"
+#include "messenger/messenger.h"
 #include "metrics/metrics_thread.h"
+#include "network/connection_handle_factory.h"
 #include "network/postgres/postgres_command_factory.h"
 #include "network/postgres/postgres_protocol_interpreter.h"
 #include "network/terrier_server.h"
@@ -16,6 +19,8 @@
 #include "settings/settings_manager.h"
 #include "settings/settings_param.h"
 #include "storage/garbage_collector_thread.h"
+#include "storage/replication/replication_manager.h"
+#include "traffic_cop/traffic_cop.h"
 #include "transaction/deferred_action_manager.h"
 #include "transaction/transaction_manager.h"
 
@@ -220,7 +225,7 @@ class DBMain {
   };
 
   /**
-   * ConnectionHandleFactory, CommandFactory, ProtocolInterpreter::Provider, Server
+   * ConnectionHandleFactory, CommandFactory, ProtocolInterpreterProvider, Server
    */
   class NetworkLayer {
    public:
@@ -233,7 +238,7 @@ class DBMain {
      */
     NetworkLayer(const common::ManagedPointer<common::DedicatedThreadRegistry> thread_registry,
                  const common::ManagedPointer<trafficcop::TrafficCop> traffic_cop, const uint16_t port,
-                 const uint16_t connection_thread_count, const std::string socket_directory) {
+                 const uint16_t connection_thread_count, const std::string &socket_directory) {
       connection_handle_factory_ = std::make_unique<network::ConnectionHandleFactory>(traffic_cop);
       command_factory_ = std::make_unique<network::PostgresCommandFactory>();
       provider_ =
@@ -252,7 +257,7 @@ class DBMain {
     // Order matters here for destruction order
     std::unique_ptr<network::ConnectionHandleFactory> connection_handle_factory_;
     std::unique_ptr<network::PostgresCommandFactory> command_factory_;
-    std::unique_ptr<network::ProtocolInterpreter::Provider> provider_;
+    std::unique_ptr<network::ProtocolInterpreterProvider> provider_;
     std::unique_ptr<network::TerrierServer> server_;
   };
 
@@ -264,6 +269,18 @@ class DBMain {
    public:
     ExecutionLayer();
     ~ExecutionLayer();
+  };
+
+  /** Hopping on the bandwagon. TODO(WAN): better comment. */
+  class MessengerLayer {
+   public:
+    explicit MessengerLayer(const common::ManagedPointer<common::DedicatedThreadRegistry> thread_registry)
+        : messenger_owner_(std::make_unique<messenger::MessengerOwner>(thread_registry)) {}
+
+    ~MessengerLayer() = default;
+
+   private:
+    std::unique_ptr<messenger::MessengerOwner> messenger_owner_;
   };
 
   /**
@@ -364,6 +381,15 @@ class DBMain {
                                            network_port_, connection_thread_count_, uds_file_directory_);
       }
 
+      std::unique_ptr<storage::ReplicationManager> replication_manager = DISABLED;
+      if (use_replication_) {
+        replication_manager = std::make_unique<storage::ReplicationManager>(replica_config_);
+
+      std::unique_ptr<MessengerLayer> messenger_layer = DISABLED;
+      if (use_messenger_) {
+        messenger_layer = std::make_unique<MessengerLayer>(common::ManagedPointer(thread_registry));
+      }
+
       db_main->settings_manager_ = std::move(settings_manager);
       db_main->metrics_manager_ = std::move(metrics_manager);
       db_main->metrics_thread_ = std::move(metrics_thread);
@@ -378,6 +404,8 @@ class DBMain {
       db_main->execution_layer_ = std::move(execution_layer);
       db_main->traffic_cop_ = std::move(traffic_cop);
       db_main->network_layer_ = std::move(network_layer);
+      db_main->replication_manager_ = std::move(replication_manager);
+      db_main->messenger_layer_ = std::move(messenger_layer);
 
       return db_main;
     }
@@ -545,6 +573,15 @@ class DBMain {
     }
 
     /**
+     * @param value use component
+     * @return self reference for chaining
+     */
+    Builder &SetUseMessenger(const bool value) {
+      use_messenger_ = value;
+      return *this;
+    }
+
+    /**
      * @param port Network port
      * @return self reference for chaining
      */
@@ -625,6 +662,15 @@ class DBMain {
       return *this;
     }
 
+    /**
+     * @param value use component
+     * @return self reference for chaining
+     */
+    Builder &SetUseReplication(const bool value) {
+      use_replication_ = value;
+      return *this;
+    }
+
    private:
     std::unordered_map<settings::Param, settings::ParamInfo> param_map_;
 
@@ -636,6 +682,7 @@ class DBMain {
     bool use_metrics_ = false;
     uint32_t metrics_interval_ = 10000;
     bool use_metrics_thread_ = false;
+    bool metrics_query_trace_ = false;
     bool metrics_pipeline_ = false;
     bool metrics_transaction_ = false;
     bool metrics_logging_ = false;
@@ -667,6 +714,9 @@ class DBMain {
     std::string uds_file_directory_ = "/tmp/";
     uint16_t connection_thread_count_ = 4;
     bool use_network_ = false;
+    bool use_replication_ = false;
+    std::string replica_config_ = "/replica.conf";
+    bool use_messenger_ = false;
 
     /**
      * Instantiates the SettingsManager and reads all of the settings to override the Builder's settings.
@@ -709,12 +759,15 @@ class DBMain {
                             ? execution::vm::ExecutionMode::Compiled
                             : execution::vm::ExecutionMode::Interpret;
 
+      metrics_query_trace_ = settings_manager->GetBool(settings::Param::metrics_query_trace);
       metrics_pipeline_ = settings_manager->GetBool(settings::Param::metrics_pipeline);
       metrics_transaction_ = settings_manager->GetBool(settings::Param::metrics_transaction);
       metrics_logging_ = settings_manager->GetBool(settings::Param::metrics_logging);
       metrics_gc_ = settings_manager->GetBool(settings::Param::metrics_gc);
       metrics_bind_command_ = settings_manager->GetBool(settings::Param::metrics_bind_command);
       metrics_execute_command_ = settings_manager->GetBool(settings::Param::metrics_execute_command);
+
+      replica_config_ = settings_manager->GetString(settings::Param::pg_host);
 
       return settings_manager;
     }
@@ -725,6 +778,7 @@ class DBMain {
      */
     std::unique_ptr<metrics::MetricsManager> BootstrapMetricsManager() {
       std::unique_ptr<metrics::MetricsManager> metrics_manager = std::make_unique<metrics::MetricsManager>();
+      if (metrics_query_trace_) metrics_manager->EnableMetric(metrics::MetricsComponent::QUERY_TRACE, 0);
       if (metrics_pipeline_) metrics_manager->EnableMetric(metrics::MetricsComponent::EXECUTION_PIPELINE, 9);
       if (metrics_transaction_) metrics_manager->EnableMetric(metrics::MetricsComponent::TRANSACTION, 0);
       if (metrics_logging_) metrics_manager->EnableMetric(metrics::MetricsComponent::LOGGING, 0);
@@ -820,6 +874,14 @@ class DBMain {
    */
   common::ManagedPointer<ExecutionLayer> GetExecutionLayer() const { return common::ManagedPointer(execution_layer_); }
 
+  /**
+   * @return ManagedPointer to the component, can be nullptr if disabled
+   */
+  common::ManagedPointer<ReplicationManager> GetReplicationManager() const { return common::ManagedPointer(replication_manager_); }
+
+  /** @return ManagedPointer to the MessengerLayer, can be nullptr if disabled. */
+  common::ManagedPointer<MessengerLayer> GetMessengerLayer() const { return common::ManagedPointer(messenger_layer_); }
+
  private:
   // Order matters here for destruction order
   std::unique_ptr<settings::SettingsManager> settings_manager_;
@@ -837,6 +899,8 @@ class DBMain {
   std::unique_ptr<ExecutionLayer> execution_layer_;
   std::unique_ptr<trafficcop::TrafficCop> traffic_cop_;
   std::unique_ptr<NetworkLayer> network_layer_;
+  std::unique_ptr<storage::ReplicationManager> replication_manager_;
+  std::unique_ptr<MessengerLayer> messenger_layer_;
 };
 
 }  // namespace terrier

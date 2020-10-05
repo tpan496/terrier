@@ -141,6 +141,13 @@ BufferedLogWriter *LogSerializerTask::GetCurrentWriteBuffer() {
 void LogSerializerTask::HandFilledBufferToWriter() {
   // Hand over the filled buffer
   filled_buffer_queue_->Enqueue(std::make_pair(filled_buffer_, commits_in_buffer_));
+  // Call the replication manager
+  if (replication_manager_ != nullptr) {
+    BufferedLogWriter *network_buffer;
+    empty_buffer_queue_->Dequeue(&network_buffer);
+    network_buffer->CopyFromBuffer(filled_buffer_);
+    replication_manager_->AddRecordBuffer(network_buffer);
+  }
   // Signal disk log consumer task thread that a buffer has been handed over
   disk_log_writer_thread_cv_->notify_one();
   // Mark that the task doesn't have a buffer in its possession to which it can write to
@@ -151,7 +158,7 @@ void LogSerializerTask::HandFilledBufferToWriter() {
 std::tuple<uint64_t, uint64_t, uint64_t> LogSerializerTask::SerializeBuffer(
     IterableBufferSegment<LogRecord> *buffer_to_serialize) {
   uint64_t num_bytes = 0, num_records = 0, num_txns = 0;
-
+p
   // Iterate over all redo records in the redo buffer through the provided iterator
   for (LogRecord &record : *buffer_to_serialize) {
     switch (record.RecordType()) {
