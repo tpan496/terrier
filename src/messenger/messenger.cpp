@@ -148,7 +148,7 @@ class ZmqUtil {
     zmq::message_t payload_msg(msg.payload_.data(), msg.payload_.size());
     bool ok = true;
 
-    ok = ok && socket->send(identity_msg, zmq::send_flags::sndmore);
+    //ok = ok && socket->send(identity_msg, zmq::send_flags::sndmore);
     ok = ok && socket->send(delimiter_msg, zmq::send_flags::sndmore);
     ok = ok && socket->send(payload_msg, zmq::send_flags::none);
 
@@ -175,6 +175,7 @@ ConnectionId::ConnectionId(common::ManagedPointer<zmq::context_t> zmq_ctx, const
 ConnectionId::~ConnectionId() = default;
 
 Messenger::Messenger(common::ManagedPointer<MessengerLogic> messenger_logic, std::string tcp_address) : messenger_logic_(messenger_logic) {
+  MESSENGER_LOG_ERROR(tcp_address);
   // Create a ZMQ context. A ZMQ context abstracts away all of the in-process and networked sockets that ZMQ uses.
   // The ZMQ context is also the transport for in-process ("inproc") sockets.
   // Generally speaking, a single process should only have a single ZMQ context.
@@ -240,12 +241,12 @@ void Messenger::ServerLoop() {
     ZmqMessage msg = ZmqUtil::RecvMsg(socket);
 
     messenger_logic_->ProcessMessage(msg.identity_, msg.payload_);
-    messenger::ZmqMessage reply;
-    reply.identity_ = msg.identity_;
-    reply.payload_ = "pong";
-    ZmqUtil::SendMsg(socket, reply);
-    //MESSENGER_LOG_INFO("SEND \"{}\": \"{}\"", reply.identity_, reply.payload_);
-    MESSENGER_LOG_ERROR("SEND \"{}\": \"{}\" \"{}\"", reply.identity_, reply.payload_, msg.payload_);
+    //messenger::ZmqMessage reply;
+    //reply.identity_ = msg.identity_;
+    //reply.payload_ = "pong";
+    //ZmqUtil::SendMsg(socket, reply);
+    ////MESSENGER_LOG_INFO("SEND \"{}\": \"{}\"", reply.identity_, reply.payload_);
+    //MESSENGER_LOG_ERROR("SEND \"{}\": \"{}\" \"{}\"", reply.identity_, reply.payload_, msg.payload_);
   }
 }
 

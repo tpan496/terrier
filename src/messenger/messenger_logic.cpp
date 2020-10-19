@@ -7,7 +7,7 @@
 namespace terrier::messenger {
 
 void MessengerLogic::ProcessMessage(std::string_view sender, std::string_view message) {
-  //TERRIER_ASSERT(!message.empty(), "Empty messages are currently forbidden. Is there a use case for this?");
+  TERRIER_ASSERT(!message.empty(), "Empty messages are currently forbidden. Is there a use case for this?");
 
   // TODO(WAN): Document protocol.
   // Process the message.
@@ -16,6 +16,8 @@ void MessengerLogic::ProcessMessage(std::string_view sender, std::string_view me
   const char function = *data++;
   // The remaining bytes are the payload.
   const char *payload = data;
+
+  MESSENGER_LOG_ERROR(message);
 
   // A suggestion for adding additional functions in the future.
   // Write a wrapper for all functions that parse out the remaining payload.
@@ -26,6 +28,10 @@ void MessengerLogic::ProcessMessage(std::string_view sender, std::string_view me
     }
     case Callbacks::PRINT: {
       MESSENGER_LOG_INFO(fmt::format("RECV \"{}\": \"{}\"", sender, payload));
+      break;
+    }
+    case Callbacks::CONNECTED:{
+      MESSENGER_LOG_INFO("Connected");
       break;
     }
   }

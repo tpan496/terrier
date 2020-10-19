@@ -4,6 +4,7 @@
 #include <string>
 #include <unordered_map>
 #include <utility>
+#include <storage/replication/replication_manager.h>
 
 #include "catalog/catalog.h"
 #include "common/action_context.h"
@@ -316,12 +317,29 @@ class DBMain {
       auto buffer_segment_pool =
           std::make_unique<storage::RecordBufferSegmentPool>(record_buffer_segment_size_, record_buffer_segment_reuse_);
 
+      std::unique_ptr<MessengerLayer> messenger_layer = DISABLED;
+      if (use_messenger_) {
+        std::string address;
+        if (replication_port_ == 9022) {
+          address = "tcp://*:9022";
+        } else {
+          address = "tcp://*:9023";
+        }
+        messenger_layer = std::make_unique<MessengerLayer>(common::ManagedPointer(thread_registry), address);
+      }
+
+      std::unique_ptr<storage::ReplicationManager> replication_manager = DISABLED;
+      if (use_messenger_) {
+        replication_manager = std::make_unique<storage::ReplicationManager>(messenger_layer->messenger_owner_->GetMessenger(), "", replication_ip_address_, replication_port_);
+      }
+
       std::unique_ptr<storage::LogManager> log_manager = DISABLED;
       if (use_logging_) {
         log_manager = std::make_unique<storage::LogManager>(
             wal_file_path_, wal_num_buffers_, std::chrono::microseconds{wal_serialization_interval_},
             std::chrono::microseconds{wal_persist_interval_}, wal_persist_threshold_,
-            common::ManagedPointer(buffer_segment_pool), common::ManagedPointer(thread_registry));
+            common::ManagedPointer(buffer_segment_pool), common::ManagedPointer(thread_registry),
+            common::ManagedPointer<storage::ReplicationManager>(replication_manager));
         log_manager->Start();
       }
 
@@ -379,11 +397,6 @@ class DBMain {
                                            network_port_, connection_thread_count_, uds_file_directory_);
       }
 
-      std::unique_ptr<MessengerLayer> messenger_layer = DISABLED;
-      if (use_messenger_) {
-        messenger_layer = std::make_unique<MessengerLayer>(common::ManagedPointer(thread_registry), replica_tcp_address_);
-      }
-
       db_main->settings_manager_ = std::move(settings_manager);
       db_main->metrics_manager_ = std::move(metrics_manager);
       db_main->metrics_thread_ = std::move(metrics_thread);
@@ -399,6 +412,7 @@ class DBMain {
       db_main->traffic_cop_ = std::move(traffic_cop);
       db_main->network_layer_ = std::move(network_layer);
       db_main->messenger_layer_ = std::move(messenger_layer);
+      db_main->replication_manager_ = std::move(replication_manager);
 
       return db_main;
     }
@@ -655,8 +669,9 @@ class DBMain {
       return *this;
     }
 
-    Builder &SetReplicaTCPAddress(const std::string value) {
-      replica_tcp_address_ = value;
+    Builder &SetReplicationDestination(const std::string& ip, int port) {
+      replication_ip_address_ = ip;
+      replication_port_ = port;
       return *this;
     }
 
@@ -704,7 +719,8 @@ class DBMain {
     uint16_t connection_thread_count_ = 4;
     bool use_network_ = false;
     bool use_messenger_ = true;
-    std::string replica_tcp_address_ = "tcp://*:9022";
+    std::string replication_ip_address_ = "127.0.0.1";
+    int replication_port_ = 9022;
 
     /**
      * Instantiates the SettingsManager and reads all of the settings to override the Builder's settings.
@@ -863,6 +879,8 @@ class DBMain {
   /** @return ManagedPointer to the MessengerLayer, can be nullptr if disabled. */
   common::ManagedPointer<MessengerLayer> GetMessengerLayer() const { return common::ManagedPointer(messenger_layer_); }
 
+  common::ManagedPointer<storage::ReplicationManager> GetReplicationManager() const { return common::ManagedPointer(replication_manager_); }
+
  private:
   // Order matters here for destruction order
   std::unique_ptr<settings::SettingsManager> settings_manager_;
@@ -881,6 +899,7 @@ class DBMain {
   std::unique_ptr<trafficcop::TrafficCop> traffic_cop_;
   std::unique_ptr<NetworkLayer> network_layer_;
   std::unique_ptr<MessengerLayer> messenger_layer_;
+  std::unique_ptr<storage::ReplicationManager> replication_manager_;
 };
 
 }  // namespace terrier

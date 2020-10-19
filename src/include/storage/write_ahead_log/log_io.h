@@ -154,7 +154,16 @@ class BufferedLogWriter {
   }
 
   std::string GetBuffer() const {
-    return std::string(buffer_);
+    return std::string(buffer_, buffer_size_);
+  }
+
+  /**
+ * Copies the contents of another buffer into this buffer
+ * @param other buffer to copy from
+ */
+  void CopyFromBuffer(BufferedLogWriter *other) {
+    TERRIER_ASSERT(CanBuffer(other->buffer_size_), "Not enough space to copy into");
+    BufferWrite(other->buffer_, other->buffer_size_);
   }
 
  private:
