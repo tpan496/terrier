@@ -19,6 +19,7 @@
 #include "settings/settings_manager.h"
 #include "settings/settings_param.h"
 #include "storage/garbage_collector_thread.h"
+#include "storage/replication/replication_manager.h"
 #include "traffic_cop/traffic_cop.h"
 #include "transaction/deferred_action_manager.h"
 #include "transaction/transaction_manager.h"
@@ -355,12 +356,27 @@ class DBMain {
       auto buffer_segment_pool =
           std::make_unique<storage::RecordBufferSegmentPool>(record_buffer_segment_size_, record_buffer_segment_reuse_);
 
+      std::unique_ptr<MessengerLayer> messenger_layer = DISABLED;
+      if (use_messenger_) {
+        messenger_layer = std::make_unique<MessengerLayer>(common::ManagedPointer(thread_registry), messenger_port_,
+                                                           messenger_identity_);
+      }
+
+      std::unique_ptr<storage::ReplicationManager> replication_manager = DISABLED;
+      if (use_messenger_ && use_replication_) {
+        auto log_provider =
+            std::make_unique<storage::ReplicationLogProvider>(replication_timeout_, use_synchronous_replication_);
+        replication_manager = std::make_unique<storage::ReplicationManager>(messenger_layer->GetMessenger(),
+                                                                            common::ManagedPointer(log_provider));
+      }
+
       std::unique_ptr<storage::LogManager> log_manager = DISABLED;
       if (use_logging_) {
         log_manager = std::make_unique<storage::LogManager>(
             wal_file_path_, wal_num_buffers_, std::chrono::microseconds{wal_serialization_interval_},
             std::chrono::microseconds{wal_persist_interval_}, wal_persist_threshold_,
-            common::ManagedPointer(buffer_segment_pool), common::ManagedPointer(thread_registry));
+            common::ManagedPointer(buffer_segment_pool), common::ManagedPointer(thread_registry),
+            common::ManagedPointer<storage::ReplicationManager>(replication_manager));
         log_manager->Start();
       }
 
@@ -419,12 +435,6 @@ class DBMain {
                                            network_port_, connection_thread_count_, uds_file_directory_);
       }
 
-      std::unique_ptr<MessengerLayer> messenger_layer = DISABLED;
-      if (use_messenger_) {
-        messenger_layer = std::make_unique<MessengerLayer>(common::ManagedPointer(thread_registry), messenger_port_,
-                                                           messenger_identity_);
-      }
-
       db_main->settings_manager_ = std::move(settings_manager);
       db_main->metrics_manager_ = std::move(metrics_manager);
       db_main->metrics_thread_ = std::move(metrics_thread);
@@ -440,6 +450,7 @@ class DBMain {
       db_main->traffic_cop_ = std::move(traffic_cop);
       db_main->network_layer_ = std::move(network_layer);
       db_main->messenger_layer_ = std::move(messenger_layer);
+      db_main->replication_manager_ = std::move(replication_manager);
 
       return db_main;
     }
@@ -643,6 +654,33 @@ class DBMain {
     }
 
     /**
+     * @param identity use component
+     * @return self reference for chaining
+     */
+    Builder &SetUseReplication(const bool value) {
+      use_replication_ = value;
+      return *this;
+    }
+
+    /**
+     * @param identity Replication timeout
+     * @return self reference for chaining
+     */
+    Builder &SetReplicationTimeout(const uint16_t timeout_seconds) {
+      replication_timeout_ = std::chrono::seconds(timeout_seconds);
+      return *this;
+    }
+
+    /**
+     * @param identity Synchronous replication
+     * @return self reference for chaining
+     */
+    Builder &SetSynchronousReplication(const bool value) {
+      use_synchronous_replication_ = value;
+      return *this;
+    }
+
+    /**
      * @param value RecordBufferSegmentPool argument
      * @return self reference for chaining
      */
@@ -761,6 +799,9 @@ class DBMain {
     bool use_messenger_ = false;
     uint16_t messenger_port_ = 9022;
     std::string messenger_identity_ = "primary";
+    bool use_replication_ = false;
+    std::chrono::seconds replication_timeout_{10};
+    bool use_synchronous_replication_ = false;
 
     /**
      * Instantiates the SettingsManager and reads all of the settings to override the Builder's settings.
@@ -797,7 +838,7 @@ class DBMain {
       // TODO(WAN): open an issue for handling settings.
       //  If you set it with the builder, it gets overwritten.
       //  If you set it with the setting manager, it isn't mutable.
-      network_port_ = static_cast<uint16_t>(settings_manager->GetInt(settings::Param::port));
+      //      network_port_ = static_cast<uint16_t>(settings_manager->GetInt(settings::Param::port));
       connection_thread_count_ =
           static_cast<uint16_t>(settings_manager->GetInt(settings::Param::connection_thread_count));
       optimizer_timeout_ = static_cast<uint64_t>(settings_manager->GetInt(settings::Param::task_execution_timeout));
@@ -817,6 +858,8 @@ class DBMain {
       execute_command_metrics_ = settings_manager->GetBool(settings::Param::execute_command_metrics_enable);
 
       use_messenger_ = settings_manager->GetBool(settings::Param::messenger_enable);
+      use_replication_ = settings_manager->GetBool(settings::Param::replication_enable);
+      replication_timeout_ = std::chrono::seconds{settings_manager->GetInt(settings::Param::replication_timeout)};
 
       return settings_manager;
     }
@@ -929,6 +972,11 @@ class DBMain {
   /** @return ManagedPointer to the MessengerLayer, can be nullptr if disabled. */
   common::ManagedPointer<MessengerLayer> GetMessengerLayer() const { return common::ManagedPointer(messenger_layer_); }
 
+  /** @return ManagedPointer to the MessengerLayer, can be nullptr if disabled. */
+  common::ManagedPointer<storage::ReplicationManager> GetReplicationManager() const {
+    return common::ManagedPointer(replication_manager_);
+  }
+
  private:
   // Order matters here for destruction order
   std::unique_ptr<settings::SettingsManager> settings_manager_;
@@ -947,6 +995,7 @@ class DBMain {
   std::unique_ptr<trafficcop::TrafficCop> traffic_cop_;
   std::unique_ptr<NetworkLayer> network_layer_;
   std::unique_ptr<MessengerLayer> messenger_layer_;
+  std::unique_ptr<storage::ReplicationManager> replication_manager_;
 };
 
 }  // namespace noisepage
