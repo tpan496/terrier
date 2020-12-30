@@ -292,6 +292,9 @@ uint64_t LogSerializerTask::SerializeRecord(const noisepage::storage::LogRecord 
       auto *record_body = record.GetUnderlyingRecordBodyAs<CommitRecord>();
       num_bytes += WriteValue(record_body->CommitTime());
       num_bytes += WriteValue(record_body->OldestActiveTxn());
+      if (replication_manager_->GetPort() == 15445) {
+        STORAGE_LOG_INFO(fmt::format("Commit Id: {}", record.TxnBegin()));
+      }
       break;
     }
     case LogRecordType::ABORT: {
