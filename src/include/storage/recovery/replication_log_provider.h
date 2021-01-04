@@ -32,6 +32,7 @@ class ReplicationLogProvider final : public AbstractLogProvider {
    * @param buffer buffer of log records.
    */
   void HandBufferToReplication(std::unique_ptr<network::ReadBuffer> buffer) {
+    STORAGE_LOG_ERROR("Handing buffer");
     std::unique_lock<std::mutex> lock(replication_latch_);
     arrived_buffer_queue_.emplace(std::move(buffer));
     replication_cv_.notify_one();

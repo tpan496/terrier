@@ -65,7 +65,7 @@ class ReplicationManager {
 
   ReplicationManager(common::ManagedPointer<messenger::Messenger> messenger, const std::string &network_identity,
                      uint16_t port, const std::string &replication_hosts_path,
-                     common::ManagedPointer<storage::ReplicationLogProvider> provider);
+                     common::ManagedPointer<storage::AbstractLogProvider> provider);
 
   /**
    * Establish a connection to a replica.
@@ -156,7 +156,7 @@ class ReplicationManager {
   std::condition_variable cvar_;
 
   common::ManagedPointer<storage::RecoveryManager> recovery_manager_;
-  common::ManagedPointer<storage::ReplicationLogProvider> replication_log_provider_;
+  common::ManagedPointer<storage::AbstractLogProvider> replication_log_provider_;
   /** Keeps track of currently stored record buffers. */
   common::ConcurrentQueue<storage::SerializedLogs> replication_consumer_queue_;
   /** Used for determining whether the message being sent over is used for replication. */

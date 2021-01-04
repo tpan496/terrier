@@ -19,7 +19,7 @@ Replica::Replica(common::ManagedPointer<noisepage::messenger::Messenger> messeng
 ReplicationManager::ReplicationManager(common::ManagedPointer<noisepage::messenger::Messenger> messenger,
                                        const std::string &network_identity, uint16_t port,
                                        const std::string &replication_hosts_path,
-                                       common::ManagedPointer<storage::ReplicationLogProvider> provider)
+                                       common::ManagedPointer<storage::AbstractLogProvider> provider)
     : messenger_(messenger), identity_(network_identity), port_(port), replication_log_provider_(provider) {
   auto listen_destination = messenger::ConnectionDestination::MakeTCP("", "127.0.0.1", port);
   messenger_->ListenForConnection(
@@ -254,7 +254,7 @@ void ReplicationManager::RecoverFromSerializedLogRecords(const std::string &log_
   buffer->FillBufferFrom(view, message_size);
 
   // Pass to log provider for recovery.
-  replication_log_provider_->HandBufferToReplication(std::move(buffer));
+  dynamic_cast<storage::ReplicationLogProvider*>(replication_log_provider_.Get())->HandBufferToReplication(std::move(buffer));
   //REPLICATION_LOG_INFO("Waiting on recovery.");
   {
     std::unique_lock<std::mutex> lk(mutex_);

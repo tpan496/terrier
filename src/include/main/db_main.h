@@ -363,12 +363,11 @@ class DBMain {
                                                            messenger_identity_);
       }
 
-      std::unique_ptr<storage::ReplicationLogProvider> replication_log_provider = DISABLED;
+      std::unique_ptr<storage::AbstractLogProvider> replication_log_provider = DISABLED;
       std::unique_ptr<replication::ReplicationManager> replication_manager = DISABLED;
       if (use_replication_) {
         NOISEPAGE_ASSERT(use_replication_, "Replication is enabled.");
-        replication_log_provider =
-            std::make_unique<storage::ReplicationLogProvider>(replication_timeout_, use_synchronous_replication_);
+        replication_log_provider = std::make_unique<storage::ReplicationLogProvider>(replication_timeout_, use_synchronous_replication_);
         replication_manager = std::make_unique<replication::ReplicationManager>(
             messenger_layer->GetMessenger(), messenger_identity_, replication_port_, replication_hosts_path_,
             common::ManagedPointer(replication_log_provider));
@@ -416,8 +415,7 @@ class DBMain {
         std::chrono::seconds replication_timeout{10};
 
         recovery_manager = std::make_unique<storage::RecoveryManager>(
-            common::ManagedPointer<storage::AbstractLogProvider>(
-                static_cast<storage::AbstractLogProvider *>(replication_log_provider.get())),
+            common::ManagedPointer(replication_log_provider),
             catalog_layer->GetCatalog(), txn_layer->GetTransactionManager(), txn_layer->GetDeferredActionManager(),
             common::ManagedPointer(thread_registry), common::ManagedPointer(storage_layer->GetBlockStore()));
         replication_manager->SetRecoveryManager(common::ManagedPointer(recovery_manager));
@@ -482,6 +480,7 @@ class DBMain {
       db_main->messenger_layer_ = std::move(messenger_layer);
       db_main->replication_manager_ = std::move(replication_manager);
       db_main->recovery_manager_ = std::move(recovery_manager);
+      db_main->replication_log_provider_ = std::move(replication_log_provider);
 
       return db_main;
     }
@@ -1050,6 +1049,7 @@ class DBMain {
   std::unique_ptr<MessengerLayer> messenger_layer_;
   std::unique_ptr<replication::ReplicationManager> replication_manager_;
   std::unique_ptr<storage::RecoveryManager> recovery_manager_;
+  std::unique_ptr<storage::AbstractLogProvider> replication_log_provider_;
 };
 
 }  // namespace noisepage
