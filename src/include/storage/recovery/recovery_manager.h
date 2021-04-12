@@ -20,7 +20,10 @@
 #include "common/dedicated_thread_owner.h"
 #include "storage/recovery/abstract_log_provider.h"
 #include "storage/sql_table.h"
-#include "settings/settings_manager.h"
+
+namespace noisepage::settings {
+class SettingsManager;
+} // namespace noisepage::settings
 
 namespace noisepage {
 class RecoveryBenchmark;
