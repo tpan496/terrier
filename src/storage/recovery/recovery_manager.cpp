@@ -27,6 +27,13 @@
 #include "transaction/deferred_action_manager.h"
 #include "transaction/transaction_manager.h"
 
+// Codegen stuff
+#include "execution/compiler/compilation_context.h"
+#include "execution/compiler/executable_query.h"
+#include "execution/compiler/operator/insert_translator.h"
+#include "execution/exec/execution_settings.h"
+#include "planner/plannodes/insert_plan_node.h"
+
 namespace noisepage::storage {
 
 void RecoveryManager::StartRecovery() {
@@ -1064,6 +1071,29 @@ const catalog::Schema &RecoveryManager::GetTableSchema(
   auto search = catalog_table_schemas_.find(table_oid);
   return (search != catalog_table_schemas_.end()) ? search->second
                                                   : db_catalog->GetSchema(common::ManagedPointer(txn), table_oid);
+}
+
+void RecoveryManager::InsertRedoRecordToInsertTranslator(storage::RedoRecord *redo_record) {
+  // This has to be a redo record.
+  // Well this is from execution settings.
+  execution::exec::ExecutionSettings exec_settings{};
+  exec_settings.UpdateFromSettingsManager(settings_manager_);
+
+  // How do I construct a plan node?
+  planner::InsertPlanNode::Builder plan_builder;
+  plan_builder.SetDatabaseOid(redo_record->GetDatabaseOid());
+  plan_builder.SetTableOid(redo_record->GetTableOid());
+
+  std::unique_ptr<planner::InsertPlanNode> out_plan = plan_builder.Build();
+
+  // Can get accessor form db_main
+  auto txn = txn_manager_->BeginTransaction();
+  std::unique_ptr<catalog::CatalogAccessor> accessor =
+      catalog_->GetAccessor(common::ManagedPointer(txn), redo_record->GetDatabaseOid(), DISABLED);
+  auto exec_query = execution::compiler::CompilationContext::Compile(*out_plan, exec_settings, accessor.get(),
+                                                                     execution::compiler::CompilationMode::OneShot);
+
+  txn_manager_->Commit(txn, transaction::TransactionUtil::EmptyCallback, nullptr);
 }
 
 }  // namespace noisepage::storage

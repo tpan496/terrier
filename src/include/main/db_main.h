@@ -447,7 +447,8 @@ class DBMain {
         recovery_manager = std::make_unique<storage::RecoveryManager>(
             log_provider, catalog_layer->GetCatalog(), txn_layer->GetTransactionManager(),
             txn_layer->GetDeferredActionManager(), common::ManagedPointer(replication_manager),
-            common::ManagedPointer(thread_registry), common::ManagedPointer(storage_layer->GetBlockStore()));
+            common::ManagedPointer(thread_registry), common::ManagedPointer(storage_layer->GetBlockStore()),
+            common::ManagedPointer(settings_manager));
         recovery_manager->StartRecovery();
       }
 
