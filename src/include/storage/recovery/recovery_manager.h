@@ -20,6 +20,7 @@
 #include "common/dedicated_thread_owner.h"
 #include "storage/recovery/abstract_log_provider.h"
 #include "storage/sql_table.h"
+#include "settings/settings_manager.h"
 
 namespace noisepage {
 class RecoveryBenchmark;
@@ -90,7 +91,8 @@ class RecoveryManager : public common::DedicatedThreadOwner {
                            const common::ManagedPointer<transaction::DeferredActionManager> deferred_action_manager,
                            const common::ManagedPointer<replication::ReplicationManager> replication_manager,
                            const common::ManagedPointer<noisepage::common::DedicatedThreadRegistry> thread_registry,
-                           const common::ManagedPointer<BlockStore> store)
+                           const common::ManagedPointer<BlockStore> store,
+                           const common::ManagedPointer<settings::SettingsManager> settings_manager)
       : DedicatedThreadOwner(thread_registry),
         log_provider_(log_provider),
         catalog_(catalog),
@@ -98,6 +100,7 @@ class RecoveryManager : public common::DedicatedThreadOwner {
         deferred_action_manager_(deferred_action_manager),
         replication_manager_(replication_manager),
         block_store_(store),
+        settings_manager_(settings_manager),
         recovered_txns_(0) {
     // Initialize catalog_table_schemas_ map
     catalog_table_schemas_[catalog::postgres::PgClass::CLASS_TABLE_OID] =
@@ -147,6 +150,9 @@ class RecoveryManager : public common::DedicatedThreadOwner {
   // management/assignment is probably a larger system issue that needs to be adddressed. Block store, used to create
   // tables during recovery
   const common::ManagedPointer<BlockStore> block_store_;
+
+  // Settings manager for codegen.
+  const common::ManagedPointer<settings::SettingsManager> settings_manager_;
 
   // Used during recovery from log. Maps old tuple slot to new tuple slot
   // TODO(Gus): This map may get huge, benchmark whether this becomes a problem and if we need a more sophisticated data
@@ -406,5 +412,7 @@ class RecoveryManager : public common::DedicatedThreadOwner {
   const catalog::Schema &GetTableSchema(transaction::TransactionContext *txn,
                                         const common::ManagedPointer<catalog::DatabaseCatalog> &db_catalog,
                                         catalog::table_oid_t table_oid) const;
+
+  void InsertRedoRecordToInsertTranslator(storage::RedoRecord *redo_record);
 };
 }  // namespace noisepage::storage
