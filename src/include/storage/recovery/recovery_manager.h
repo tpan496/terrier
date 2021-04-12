@@ -21,6 +21,13 @@
 #include "storage/recovery/abstract_log_provider.h"
 #include "storage/sql_table.h"
 
+// Codegen stuff
+#include "execution/compiler/compilation_context.h"
+#include "execution/compiler/executable_query.h"
+#include "execution/compiler/operator/insert_translator.h"
+#include "execution/exec/execution_settings.h"
+#include "planner/plannodes/insert_plan_node.h"
+
 namespace noisepage::settings {
 class SettingsManager;
 } // namespace noisepage::settings
