@@ -31,6 +31,8 @@
 #include "execution/compiler/compilation_context.h"
 #include "execution/compiler/executable_query.h"
 #include "execution/exec/execution_settings.h"
+#include "planner/plannodes/output_schema.h"
+#include "planner/plannodes/insert_plan_node.h"
 
 namespace noisepage::storage {
 
@@ -1080,20 +1082,44 @@ const catalog::Schema &RecoveryManager::GetTableSchema(
 }
 
 void RecoveryManager::InsertRedoRecordToInsertTranslator(storage::RedoRecord *redo_record) {
-  // This has to be a redo record.
-  // Well this is from execution settings.
   execution::exec::ExecutionSettings exec_settings{};
   exec_settings.UpdateFromSettingsManager(settings_manager_);
 
-  // How do I construct a plan node?
+  // Convert the redo record into a plannode.
   planner::InsertPlanNode::Builder plan_builder;
   plan_builder.SetDatabaseOid(redo_record->GetDatabaseOid());
   plan_builder.SetTableOid(redo_record->GetTableOid());
 
+  // Iterate through the columns and values.
+  auto delta = redo_record->Delta();
+  auto num_colums = delta->NumColumns();
+  auto* col_oids = delta->ColumnIds();
+  noisepage::execution::compiler::test::compiler::ExpressionMaker expr_maker;
+  std::vector<common::ManagedPointer<parser::AbstractExpression>> values;
+  for (auto i = 0; i < num_colums; i+=) {
+    // Get ecolumn.
+    catalog::col_oid_t col_oid = col_ids[i]
+    plan_builder.AddParameterInfo(col_oid);
+
+    // Get value.
+    auto value = delta->AccessForceNotNull();
+
+    // Convert the values into AbstractPlanNodes.
+    
+  }
+  plan_builder.AddValues(values)
+
+  // Insert type. How do I retrieve them?
+  // Could be values/select.
+  plan_builder.SetInsertType(parser::InsertType::VALUES);
+
+  plan_builder.SetOutputSchema(std::make_unique<planner::OutputSchema>());
+  
   std::unique_ptr<planner::InsertPlanNode> out_plan = plan_builder.Build();
 
-  // Can get accessor form db_main
+  // Compile the plannode.
   auto txn = txn_manager_->BeginTransaction();
+
   std::unique_ptr<catalog::CatalogAccessor> accessor =
       catalog_->GetAccessor(common::ManagedPointer(txn), redo_record->GetDatabaseOid(), DISABLED);
   auto exec_query = execution::compiler::CompilationContext::Compile(*out_plan, exec_settings, accessor.get(),
