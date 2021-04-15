@@ -199,6 +199,7 @@ void RecoveryManager::ReplayRedoRecord(transaction::TransactionContext *txn, Log
   auto *redo_record = record->GetUnderlyingRecordBodyAs<RedoRecord>();
   auto sql_table_ptr = GetSqlTable(txn, redo_record->GetDatabaseOid(), redo_record->GetTableOid());
   if (IsInsertRecord(redo_record)) {
+    InsertRedoRecordToInsertTranslator(txn, redo_record);
     // Save the old tuple slot, and reset the tuple slot in the record
     auto old_tuple_slot = redo_record->GetTupleSlot();
     redo_record->SetTupleSlot(TupleSlot(nullptr, 0));
@@ -1081,7 +1082,10 @@ const catalog::Schema &RecoveryManager::GetTableSchema(
                                                   : db_catalog->GetSchema(common::ManagedPointer(txn), table_oid);
 }
 
-void RecoveryManager::InsertRedoRecordToInsertTranslator(storage::RedoRecord *redo_record) {
+void RecoveryManager::InsertRedoRecordToInsertTranslator(transaction::TransactionContext * txn, storage::RedoRecord *redo_record) {
+  std::unique_ptr<catalog::CatalogAccessor> accessor =
+      catalog_->GetAccessor(common::ManagedPointer(txn), redo_record->GetDatabaseOid(), DISABLED);
+  
   execution::exec::ExecutionSettings exec_settings{};
   exec_settings.UpdateFromSettingsManager(settings_manager_);
 
@@ -1091,41 +1095,58 @@ void RecoveryManager::InsertRedoRecordToInsertTranslator(storage::RedoRecord *re
   plan_builder.SetTableOid(redo_record->GetTableOid());
 
   // Iterate through the columns and values.
+  /*
   auto delta = redo_record->Delta();
   auto num_colums = delta->NumColumns();
-  auto* col_oids = delta->ColumnIds();
-  noisepage::execution::compiler::test::compiler::ExpressionMaker expr_maker;
+  auto* col_ids = delta->ColumnIds();
+  //noisepage::execution::compiler::test::compiler::ExpressionMaker expr_maker;
   std::vector<common::ManagedPointer<parser::AbstractExpression>> values;
-  for (auto i = 0; i < num_colums; i+=) {
-    // Get ecolumn.
-    catalog::col_oid_t col_oid = col_ids[i]
+  for (auto i = 0u; i < num_colums; i++) {
+    
+    // Q1. Get column. But this returns col_id_t...
+    // Seems like I need to get them from the catalog? Expensive lookup...
+    // Look into insert translator, should contain a way to do this.
+    catalog::col_oid_t col_oid = col_ids[i];
     plan_builder.AddParameterInfo(col_oid);
 
-    // Get value.
-    auto value = delta->AccessForceNotNull();
+    // Q2. Get value. This returns values as bytes.?
+    // At disk level, all expresions are constant value expressions.
+    // expr_make.CVE?
+    auto value = delta->AccessForceNotNull(i);
+    // Convert the values into AbstractExpressions. How do I know what value type this is?
+    // Use something like ExpressionMaker?
+    // values.push_back(value);
+  }*/
 
-    // Convert the values into AbstractPlanNodes.
-    
+  // Schema
+  catalog::Schema schema = accessor->GetSchema(redo_record->GetTableOid());
+  std::vector<catalog::col_oid_t> oids;
+  std::vector<common::ManagedPointer<parser::AbstractExpression>> values;
+  for (const auto &col : schema.GetColumns()) {
+    oids.emplace_back(col.Oid());
   }
-  plan_builder.AddValues(values)
+  plan_builder.AddValues(std::move(values));
 
-  // Insert type. How do I retrieve them?
-  // Could be values/select.
+  // Q3. Set Index. Again, need to convert index::Index -> index_oid_t.
+  // Find what table we are insert into, get the index on the table using the catalog.
+  // Stores index objects and schemas
+  std::vector<catalog::index_oid_t> index_oids = accessor->GetIndexOids(redo_record->GetTableOid());
+
+  // If there's no indexes on the table, we can return
+  if (index_oids.empty()) return;
+  plan_builder.SetIndexOids(std::move(index_oids));
+
+  // Q4. Insert type. How do I retrieve them? Could be values/select.
   plan_builder.SetInsertType(parser::InsertType::VALUES);
-
   plan_builder.SetOutputSchema(std::make_unique<planner::OutputSchema>());
   
   std::unique_ptr<planner::InsertPlanNode> out_plan = plan_builder.Build();
 
   // Compile the plannode.
-  auto txn = txn_manager_->BeginTransaction();
-
-  std::unique_ptr<catalog::CatalogAccessor> accessor =
-      catalog_->GetAccessor(common::ManagedPointer(txn), redo_record->GetDatabaseOid(), DISABLED);
   auto exec_query = execution::compiler::CompilationContext::Compile(*out_plan, exec_settings, accessor.get(),
                                                                      execution::compiler::CompilationMode::OneShot);
 
-  txn_manager_->Commit(txn, transaction::TransactionUtil::EmptyCallback, nullptr);
+  //txn_manager_->Commit(txn, transaction::TransactionUtil::EmptyCallback, nullptr);
 }
 
 }  // namespace noisepage::storage
