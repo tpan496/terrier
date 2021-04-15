@@ -1119,7 +1119,8 @@ void RecoveryManager::InsertRedoRecordToInsertTranslator(transaction::Transactio
   }*/
 
   // Schema
-  catalog::Schema schema = accessor->GetSchema(redo_record->GetTableOid());
+  //catalog::Schema schema = accessor->GetSchema(redo_record->GetTableOid());
+  catalog::Schema schema = GetCodeGen()->GetCatalogAccessor()->GetSchema(redo_record->GetTableOid());
   std::vector<catalog::col_oid_t> oids;
   std::vector<common::ManagedPointer<parser::AbstractExpression>> values;
   for (const auto &col : schema.GetColumns()) {

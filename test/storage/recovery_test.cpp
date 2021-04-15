@@ -36,6 +36,7 @@ class RecoveryTests : public TerrierTest {
   common::ManagedPointer<storage::LogManager> log_manager_;
   common::ManagedPointer<storage::BlockStore> block_store_;
   common::ManagedPointer<catalog::Catalog> catalog_;
+  common::ManagedPointer<settings::SettingsManager> settings_manager_;
 
   // Recovery Components
   std::unique_ptr<DBMain> recovery_db_main_;
@@ -73,6 +74,7 @@ class RecoveryTests : public TerrierTest {
     recovery_block_store_ = recovery_db_main_->GetStorageLayer()->GetBlockStore();
     recovery_catalog_ = recovery_db_main_->GetCatalogLayer()->GetCatalog();
     recovery_thread_registry_ = recovery_db_main_->GetThreadRegistry();
+    settings_manager_ = recovery_db_main_->GetSettingsManager();
   }
 
   void TearDown() override {
@@ -179,7 +181,8 @@ class RecoveryTests : public TerrierTest {
                                      recovery_deferred_action_manager_,
                                      DISABLED,
                                      recovery_thread_registry_,
-                                     recovery_block_store_};
+                                     recovery_block_store_,
+                                     settings_manager_};
     recovery_manager.StartRecovery();
     recovery_manager.WaitForRecoveryToFinish();
   }
@@ -200,7 +203,8 @@ class RecoveryTests : public TerrierTest {
                                      recovery_deferred_action_manager_,
                                      DISABLED,
                                      recovery_thread_registry_,
-                                     recovery_block_store_};
+                                     recovery_block_store_,
+                                     settings_manager_};
     recovery_manager.StartRecovery();
     recovery_manager.WaitForRecoveryToFinish();
 
@@ -666,7 +670,8 @@ TEST_F(RecoveryTests, DoubleRecoveryTest) {
                                    recovery_deferred_action_manager_,
                                    DISABLED,
                                    recovery_thread_registry_,
-                                   recovery_block_store_};
+                                   recovery_block_store_,
+                                   settings_manager_};
   recovery_manager.StartRecovery();
   recovery_manager.WaitForRecoveryToFinish();
 
@@ -726,7 +731,7 @@ TEST_F(RecoveryTests, DoubleRecoveryTest) {
   RecoveryManager secondary_recovery_manager(common::ManagedPointer<AbstractLogProvider>(&secondary_log_provider),
                                              secondary_recovery_catalog, secondary_recovery_txn_manager,
                                              secondary_recovery_deferred_action_manager, DISABLED,
-                                             secondary_recovery_thread_registry, secondary_recovery_block_store);
+                                             secondary_recovery_thread_registry, secondary_recovery_block_store, settings_manager_);
   secondary_recovery_manager.StartRecovery();
   secondary_recovery_manager.WaitForRecoveryToFinish();
 
