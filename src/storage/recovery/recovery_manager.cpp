@@ -199,7 +199,6 @@ void RecoveryManager::ReplayRedoRecord(transaction::TransactionContext *txn, Log
   auto *redo_record = record->GetUnderlyingRecordBodyAs<RedoRecord>();
   auto sql_table_ptr = GetSqlTable(txn, redo_record->GetDatabaseOid(), redo_record->GetTableOid());
   if (IsInsertRecord(redo_record)) {
-    InsertRedoRecordToInsertTranslator(txn, redo_record);
     // Save the old tuple slot, and reset the tuple slot in the record
     auto old_tuple_slot = redo_record->GetTupleSlot();
     redo_record->SetTupleSlot(TupleSlot(nullptr, 0));
@@ -1069,6 +1068,9 @@ uint32_t RecoveryManager::ProcessSpecialCasePGProcRecord(
         catalog_->GetDatabaseCatalog(common::ManagedPointer(txn), redo_record->GetDatabaseOid())
             ->SetFunctionContextPointer(common::ManagedPointer(txn), proc_oid, nullptr);
     NOISEPAGE_ASSERT(result, "Setting to null did not work");
+    if (IsInsertRecord(redo_record)) {
+      InsertRedoRecordToInsertTranslator(txn, redo_record);
+    }
     return 0;  // No additional records processed
   }
   return 0;
@@ -1081,6 +1083,8 @@ const catalog::Schema &RecoveryManager::GetTableSchema(
   return (search != catalog_table_schemas_.end()) ? search->second
                                                   : db_catalog->GetSchema(common::ManagedPointer(txn), table_oid);
 }
+
+void dos(void *stuff) {}
 
 void RecoveryManager::InsertRedoRecordToInsertTranslator(transaction::TransactionContext * txn, storage::RedoRecord *redo_record) {
   std::unique_ptr<catalog::CatalogAccessor> accessor =
@@ -1095,36 +1099,35 @@ void RecoveryManager::InsertRedoRecordToInsertTranslator(transaction::Transactio
   plan_builder.SetTableOid(redo_record->GetTableOid());
 
   // Iterate through the columns and values.
-  /*
-  auto delta = redo_record->Delta();
-  auto num_colums = delta->NumColumns();
-  auto* col_ids = delta->ColumnIds();
+  //auto delta = redo_record->Delta();
+  //auto num_colums = delta->NumColumns();
+  //auto* col_ids = delta->ColumnIds();
   //noisepage::execution::compiler::test::compiler::ExpressionMaker expr_maker;
-  std::vector<common::ManagedPointer<parser::AbstractExpression>> values;
+  /*std::vector<common::ManagedPointer<parser::AbstractExpression>> values;
   for (auto i = 0u; i < num_colums; i++) {
-    
-    // Q1. Get column. But this returns col_id_t...
-    // Seems like I need to get them from the catalog? Expensive lookup...
-    // Look into insert translator, should contain a way to do this.
-    catalog::col_oid_t col_oid = col_ids[i];
-    plan_builder.AddParameterInfo(col_oid);
-
-    // Q2. Get value. This returns values as bytes.?
+    // Get value. This returns values as bytes.?
     // At disk level, all expresions are constant value expressions.
     // expr_make.CVE?
     auto value = delta->AccessForceNotNull(i);
     // Convert the values into AbstractExpressions. How do I know what value type this is?
     // Use something like ExpressionMaker?
-    // values.push_back(value);
+    values.push_back(value);
   }*/
 
-  // Schema
-  //catalog::Schema schema = accessor->GetSchema(redo_record->GetTableOid());
-  catalog::Schema schema = GetCodeGen()->GetCatalogAccessor()->GetSchema(redo_record->GetTableOid());
-  std::vector<catalog::col_oid_t> oids;
+  // Find col_oids from the catalog.
+  auto db_catalog_ptr = GetDatabaseCatalog(txn, redo_record->GetDatabaseOid());
+  const auto &schema = GetTableSchema(txn, db_catalog_ptr, redo_record->GetTableOid());
+
   std::vector<common::ManagedPointer<parser::AbstractExpression>> values;
   for (const auto &col : schema.GetColumns()) {
-    oids.emplace_back(col.Oid());
+    plan_builder.AddParameterInfo(col.Oid());
+    /*
+    nlohmann::json expr_json = col.StoredExpression()->ToJson();
+    parser::ConstantValueExpression cve;
+    std::vector<std::unique_ptr<parser::AbstractExpression>> expr_cve = cve.FromJson(expr_json);
+    values.push_back(common::ManagedPointer(expr_cve[0]));*/
+    values.push_back(col.StoredExpressionNotConst());
+    STORAGE_LOG_ERROR(fmt::format("Expression type: {}", col.StoredExpressionNotConst()->GetExpressionName()));
   }
   plan_builder.AddValues(std::move(values));
 

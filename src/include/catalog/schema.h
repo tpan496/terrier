@@ -146,6 +146,13 @@ class Schema {
     }
 
     /**
+     * @return default value expression
+     */
+    common::ManagedPointer<parser::AbstractExpression> StoredExpressionNotConst() const {
+      return common::ManagedPointer(default_value_).CastManagedPointerTo<parser::AbstractExpression>();
+    }
+
+    /**
      * Default constructor for deserialization
      */
     Column() = default;
