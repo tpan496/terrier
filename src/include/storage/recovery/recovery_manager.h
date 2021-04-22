@@ -418,6 +418,8 @@ class RecoveryManager : public common::DedicatedThreadOwner {
                                         const common::ManagedPointer<catalog::DatabaseCatalog> &db_catalog,
                                         catalog::table_oid_t table_oid) const;
 
-  void InsertRedoRecordToInsertTranslator(transaction::TransactionContext *txn, storage::RedoRecord *redo_record);
+  void InsertRedoRecordToInsertTranslator(transaction::TransactionContext *txn,
+                                          common::ManagedPointer<storage::SqlTable> sql_table,
+                                          storage::RedoRecord *redo_record);
 };
 }  // namespace noisepage::storage

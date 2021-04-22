@@ -52,6 +52,8 @@
 #include "storage/index/index.h"
 #include "type/type_id.h"
 
+#include "loggers/selfdriving_logger.h"
+
 namespace noisepage::selfdriving {
 
 template <typename IndexPlanNode>
@@ -133,6 +135,7 @@ size_t OperatingUnitRecorder::ComputeKeySize(
   for (auto &expr : exprs) {
     AdjustKeyWithType(expr->GetReturnValueType(), &key_size, num_key);
   }
+  SELFDRIVING_LOG_ERROR(fmt::format("Compute Key Size: {}, {}", key_size, *num_key));
 
   // The set of expressions represented by exprs should have some key size
   // that is non-zero.

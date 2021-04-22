@@ -6,6 +6,7 @@
 #include "execution/sql/generic_value.h"
 #include "parser/expression/constant_value_expression.h"
 #include "spdlog/fmt/fmt.h"
+#include "loggers/execution_logger.h"
 
 namespace noisepage::execution::compiler {
 
@@ -17,7 +18,7 @@ ast::Expr *ConstantTranslator::DeriveValue(WorkContext *ctx, const ColumnValuePr
   auto *codegen = GetCodeGen();
   const auto &val = GetExpressionAs<const parser::ConstantValueExpression>();
   const auto type_id = sql::GetTypeId(val.GetReturnValueType());
-
+  EXECUTION_LOG_ERROR(fmt::format("Is Null: {}", val.IsNull()));
   if (val.IsNull()) {
     return codegen->ConstNull(val.GetReturnValueType());
   }

@@ -33,6 +33,7 @@
 #include "execution/exec/execution_settings.h"
 #include "planner/plannodes/output_schema.h"
 #include "planner/plannodes/insert_plan_node.h"
+#include "execution/compiler/expression/expression_translator.h"
 
 namespace noisepage::storage {
 
@@ -137,6 +138,7 @@ void RecoveryManager::ProcessCommittedTransaction(noisepage::transaction::timest
     if (IsSpecialCaseCatalogRecord(buffered_record)) {
       idx += ProcessSpecialCaseCatalogRecord(txn, &buffered_changes_map_[txn_id], idx);
     } else if (buffered_record->RecordType() == LogRecordType::REDO) {
+      STORAGE_LOG_ERROR("Process Committed Transaction");
       ReplayRedoRecord(txn, buffered_record);
     } else {
       ReplayDeleteRecord(txn, buffered_record);
@@ -199,6 +201,7 @@ void RecoveryManager::ReplayRedoRecord(transaction::TransactionContext *txn, Log
   auto *redo_record = record->GetUnderlyingRecordBodyAs<RedoRecord>();
   auto sql_table_ptr = GetSqlTable(txn, redo_record->GetDatabaseOid(), redo_record->GetTableOid());
   if (IsInsertRecord(redo_record)) {
+    STORAGE_LOG_ERROR("Insert Record");
     // Save the old tuple slot, and reset the tuple slot in the record
     auto old_tuple_slot = redo_record->GetTupleSlot();
     redo_record->SetTupleSlot(TupleSlot(nullptr, 0));
@@ -216,7 +219,18 @@ void RecoveryManager::ReplayRedoRecord(transaction::TransactionContext *txn, Log
                      "Insert should update redo record with new tuple slot");
     // Create a mapping of the old to new tuple. The new tuple slot should be used for future updates and deletes.
     tuple_slot_map_[old_tuple_slot] = new_tuple_slot;
+    auto db_catalog_ptr = GetDatabaseCatalog(txn, redo_record->GetDatabaseOid());
+    const auto &schema = GetTableSchema(txn, db_catalog_ptr, redo_record->GetTableOid());
+    for (const auto &col : schema.GetColumns()) {
+      common::ManagedPointer<parser::AbstractExpression> expression;
+      expression = col.StoredExpressionNotConst();
+      const auto &val = static_cast<parser::ConstantValueExpression &>(*expression);
+      const auto type_id = execution::sql::GetTypeId(val.GetReturnValueType());
+      STORAGE_LOG_ERROR(fmt::format("col: {}, type_id: {}", col.Oid(), type_id));
+    }
+    //InsertRedoRecordToInsertTranslator(txn, sql_table_ptr, redo_record);
   } else {
+    STORAGE_LOG_ERROR("Non-Insert Record");
     auto new_tuple_slot = tuple_slot_map_[redo_record->GetTupleSlot()];
     redo_record->SetTupleSlot(new_tuple_slot);
     // Stage the write. This way the recovery operation is logged if logging is enabled
@@ -625,6 +639,7 @@ uint32_t RecoveryManager::ProcessSpecialCasePGClassRecord(
 
     switch (updated_pg_class_oid.UnderlyingValue()) {
       case (catalog::postgres::PgClass::REL_NEXTCOLOID.oid_.UnderlyingValue()): {  // Case 1
+        STORAGE_LOG_ERROR("Process Special Case PG Class Record");
         ReplayRedoRecord(txn, curr_record);
         return 0;  // No additional logs processed
       }
@@ -1048,6 +1063,7 @@ uint32_t RecoveryManager::ProcessSpecialCasePGProcRecord(
   if (curr_record->RecordType() == LogRecordType::REDO) {
     auto *redo_record = curr_record->GetUnderlyingRecordBodyAs<RedoRecord>();
     if (IsInsertRecord(redo_record)) {
+      STORAGE_LOG_ERROR("Process Special Case PG Proc Record");
       ReplayRedoRecord(txn, curr_record);
     } else {
       return 0;
@@ -1068,9 +1084,6 @@ uint32_t RecoveryManager::ProcessSpecialCasePGProcRecord(
         catalog_->GetDatabaseCatalog(common::ManagedPointer(txn), redo_record->GetDatabaseOid())
             ->SetFunctionContextPointer(common::ManagedPointer(txn), proc_oid, nullptr);
     NOISEPAGE_ASSERT(result, "Setting to null did not work");
-    if (IsInsertRecord(redo_record)) {
-      InsertRedoRecordToInsertTranslator(txn, redo_record);
-    }
     return 0;  // No additional records processed
   }
   return 0;
@@ -1086,7 +1099,9 @@ const catalog::Schema &RecoveryManager::GetTableSchema(
 
 void dos(void *stuff) {}
 
-void RecoveryManager::InsertRedoRecordToInsertTranslator(transaction::TransactionContext * txn, storage::RedoRecord *redo_record) {
+void RecoveryManager::InsertRedoRecordToInsertTranslator(transaction::TransactionContext *txn,
+                                                         common::ManagedPointer<storage::SqlTable> sql_table,
+                                                         storage::RedoRecord *redo_record) {
   std::unique_ptr<catalog::CatalogAccessor> accessor =
       catalog_->GetAccessor(common::ManagedPointer(txn), redo_record->GetDatabaseOid(), DISABLED);
   
@@ -1118,16 +1133,29 @@ void RecoveryManager::InsertRedoRecordToInsertTranslator(transaction::Transactio
   auto db_catalog_ptr = GetDatabaseCatalog(txn, redo_record->GetDatabaseOid());
   const auto &schema = GetTableSchema(txn, db_catalog_ptr, redo_record->GetTableOid());
 
+  std::vector<catalog::col_oid_t> col_oids;
+  /*
+  for (uint16_t i = 0; i < redo_record->Delta()->NumColumns(); i++) {
+    col_id_t col_id = redo_record->Delta()->ColumnIds()[i];
+    // We should ingore the version pointer column, this is a hidden storage layer column
+    if (col_id != VERSION_POINTER_COLUMN_ID) {
+      col_oids.emplace_back(sql_table->OidForColId(col_id));
+      //byte *raw_bytes = redo_record->Delta()->AccessWithNullCheck(i);
+      //parser::ConstantValueExpression cve;
+      //reinterpret_cast<const T *>(raw_bytes);
+      STORAGE_LOG_ERROR(fmt::format("col: {}", sql_table->OidForColId(col_id)));
+    }
+  }*/
+  
   std::vector<common::ManagedPointer<parser::AbstractExpression>> values;
   for (const auto &col : schema.GetColumns()) {
     plan_builder.AddParameterInfo(col.Oid());
-    /*
-    nlohmann::json expr_json = col.StoredExpression()->ToJson();
-    parser::ConstantValueExpression cve;
-    std::vector<std::unique_ptr<parser::AbstractExpression>> expr_cve = cve.FromJson(expr_json);
-    values.push_back(common::ManagedPointer(expr_cve[0]));*/
-    values.push_back(col.StoredExpressionNotConst());
-    STORAGE_LOG_ERROR(fmt::format("Expression type: {}", col.StoredExpressionNotConst()->GetExpressionName()));
+    common::ManagedPointer<parser::AbstractExpression> expression;
+    expression = col.StoredExpressionNotConst();
+    const auto &val = static_cast<parser::ConstantValueExpression &>(*expression);
+    const auto type_id = execution::sql::GetTypeId(val.GetReturnValueType());
+    STORAGE_LOG_ERROR(fmt::format("col: {}, type_id: {}", col.Oid(), type_id));
+    values.push_back(expression);
   }
   plan_builder.AddValues(std::move(values));
 

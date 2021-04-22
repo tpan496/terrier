@@ -104,6 +104,7 @@ ast::Expr *CodeGen::ConstString(std::string_view str) const {
 }
 
 ast::Expr *CodeGen::ConstNull(type::TypeId type) const {
+  //EXECUTION_LOG_ERROR(fmt::format("ConstNull: {}", type));
   ast::Expr *dummy_expr;
   // initSqlNull(&expr) produces a NULL of expr's type.
   switch (type) {
