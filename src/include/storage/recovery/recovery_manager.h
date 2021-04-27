@@ -20,6 +20,8 @@
 #include "common/dedicated_thread_owner.h"
 #include "storage/recovery/abstract_log_provider.h"
 #include "storage/sql_table.h"
+#include "loggers/storage_logger.h"
+#include "execution/sql/value_util.h"
 
 namespace noisepage::settings {
 class SettingsManager;
@@ -38,6 +40,70 @@ class TransactionManager;
 }  // namespace noisepage::transaction
 
 namespace noisepage::storage {
+
+class ExpressionMaker {
+ public:
+  using OwnedExpression = std::unique_ptr<parser::AbstractExpression>;
+  using ManagedExpression = common::ManagedPointer<parser::AbstractExpression>;
+
+  ManagedExpression MakeManaged(OwnedExpression &&expr) {
+    owned_exprs_.emplace_back(std::move(expr));
+    return ManagedExpression(owned_exprs_.back());
+  }
+
+  /**
+   * Create a NULL constant expression
+   */
+  ManagedExpression Constant() {
+    return MakeManaged(
+        std::make_unique<parser::ConstantValueExpression>());
+  }
+
+  /**
+   * Create an boolean constant expression
+   */
+  ManagedExpression Constant(bool val) {
+    //STORAGE_LOG_ERROR(fmt::format("BOOLEAN: {}", val));
+    return MakeManaged(
+        std::make_unique<parser::ConstantValueExpression>(type::TypeId::BOOLEAN, execution::sql::BoolVal(val)));
+  }
+
+  /**
+   * Create an integer constant expression
+   */
+  ManagedExpression Constant(int32_t val) {
+    return MakeManaged(
+        std::make_unique<parser::ConstantValueExpression>(type::TypeId::INTEGER, execution::sql::Integer(val)));
+  }
+
+  /**
+   * Create a floating point constant expression
+   */
+  ManagedExpression Constant(double val) {
+    return MakeManaged(
+        std::make_unique<parser::ConstantValueExpression>(type::TypeId::REAL, execution::sql::Real(val)));
+  }
+
+  /**
+   * Create a string constant expression
+   */
+  ManagedExpression Constant(const std::string &str) {
+    auto string_val = execution::sql::ValueUtil::CreateStringVal(str);
+    return MakeManaged(std::make_unique<parser::ConstantValueExpression>(type::TypeId::VARCHAR, string_val.first,
+                                                                         std::move(string_val.second)));
+  }
+
+  /**
+   * Create a date constant expression
+   */
+  ManagedExpression Constant(int32_t year, uint32_t month, uint32_t day) {
+    return MakeManaged(std::make_unique<parser::ConstantValueExpression>(
+        type::TypeId::DATE, execution::sql::DateVal(execution::sql::Date::FromYMD(year, month, day))));
+  }
+ private:
+  // To ease memory management
+  std::vector<OwnedExpression> owned_exprs_;
+};
 
 /**
  * Recovery Manager

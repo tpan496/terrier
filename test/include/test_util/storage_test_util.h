@@ -28,6 +28,7 @@
 #include "test_util/random_test_util.h"
 #include "transaction/transaction_manager.h"
 #include "type/type_id.h"
+#include "loggers/storage_logger.h"
 
 namespace noisepage {
 class StorageTestUtil {
@@ -588,8 +589,10 @@ class StorageTestUtil {
     std::vector<catalog::Schema::Column> columns;
     columns.reserve(num_attrs);
 
+      STORAGE_LOG_ERROR(fmt::format("Num attrs: {}", num_attrs));
     for (uint16_t i = 0; i < num_attrs; i++) {
       auto random_type = *RandomTestUtil::UniformRandomElement(&possible_attr_types, generator);
+      STORAGE_LOG_ERROR(fmt::format("Type: {}", random_type));
 
       catalog::Schema::Column col;
       if (random_type == type::TypeId::VARCHAR) {

@@ -217,13 +217,14 @@ void RecoveryManager::ReplayRedoRecord(transaction::TransactionContext *txn, Log
   auto sql_table_ptr = GetSqlTable(txn, redo_record->GetDatabaseOid(), redo_record->GetTableOid());
   if (IsInsertRecord(redo_record)) {
     //STORAGE_LOG_ERROR("Insert Record");
-    /*auto table_oid = redo_record->GetTableOid();
+    auto table_oid = redo_record->GetTableOid();
     if (IsSpecialPGTables(table_oid)) {
       //STORAGE_LOG_ERROR("PG Tables");
     } else {
       InsertRedoRecordToInsertTranslator(txn, sql_table_ptr, redo_record);
       return;
-    }*/
+    }
+
     // Save the old tuple slot, and reset the tuple slot in the record
     auto old_tuple_slot = redo_record->GetTupleSlot();
     redo_record->SetTupleSlot(TupleSlot(nullptr, 0));
@@ -241,6 +242,7 @@ void RecoveryManager::ReplayRedoRecord(transaction::TransactionContext *txn, Log
                      "Insert should update redo record with new tuple slot");
     // Create a mapping of the old to new tuple. The new tuple slot should be used for future updates and deletes.
     tuple_slot_map_[old_tuple_slot] = new_tuple_slot;
+
   } else {
     // STORAGE_LOG_ERROR("Non-Insert Record");
     auto new_tuple_slot = tuple_slot_map_[redo_record->GetTupleSlot()];
@@ -1112,6 +1114,10 @@ const catalog::Schema &RecoveryManager::GetTableSchema(
 
 void dos(void *stuff) {}
 
+void InsertCallback (byte* tuples, uint32_t num_tuples, uint32_t tuple_size) {
+  STORAGE_LOG_ERROR(fmt::format("num_tuples: {}, tuple_size: {}", num_tuples, tuple_size));
+}
+
 void RecoveryManager::InsertRedoRecordToInsertTranslator(transaction::TransactionContext *txn,
                                                          common::ManagedPointer<storage::SqlTable> sql_table,
                                                          storage::RedoRecord *redo_record) {
@@ -1126,49 +1132,59 @@ void RecoveryManager::InsertRedoRecordToInsertTranslator(transaction::Transactio
   plan_builder.SetDatabaseOid(redo_record->GetDatabaseOid());
   plan_builder.SetTableOid(redo_record->GetTableOid());
 
-  // Iterate through the columns and values.
-  //auto delta = redo_record->Delta();
-  //auto num_colums = delta->NumColumns();
-  //auto* col_ids = delta->ColumnIds();
-  //noisepage::execution::compiler::test::compiler::ExpressionMaker expr_maker;
-  /*std::vector<common::ManagedPointer<parser::AbstractExpression>> values;
-  for (auto i = 0u; i < num_colums; i++) {
-    // Get value. This returns values as bytes.?
-    // At disk level, all expresions are constant value expressions.
-    // expr_make.CVE?
-    auto value = delta->AccessForceNotNull(i);
-    // Convert the values into AbstractExpressions. How do I know what value type this is?
-    // Use something like ExpressionMaker?
-    values.push_back(value);
-  }*/
-
   // Find col_oids from the catalog.
   auto db_catalog_ptr = GetDatabaseCatalog(txn, redo_record->GetDatabaseOid());
   const auto &schema = GetTableSchema(txn, db_catalog_ptr, redo_record->GetTableOid());
 
-  std::vector<catalog::col_oid_t> col_oids;
-  /*
+  auto pred = std::make_unique<parser::ConstantValueExpression>(type::TypeId::BOOLEAN, execution::sql::BoolVal(true));
+  std::vector<planner::OutputSchema::Column> cols;
+  std::unordered_map<catalog::col_oid_t, type::TypeId> col_types;
+  for (const auto &col : schema.GetColumns()) {
+    plan_builder.AddParameterInfo(col.Oid());
+    common::ManagedPointer<parser::AbstractExpression> expression = col.StoredExpressionNotConst();
+    cols.emplace_back(planner::OutputSchema::Column(col.Name(), type::TypeId::BOOLEAN, std::move(pred)));
+    col_types[col.Oid()] = expression->GetReturnValueType();
+  }
+
+  std::vector<common::ManagedPointer<parser::AbstractExpression>> values;
+  ExpressionMaker expr_maker;
   for (uint16_t i = 0; i < redo_record->Delta()->NumColumns(); i++) {
     col_id_t col_id = redo_record->Delta()->ColumnIds()[i];
     // We should ingore the version pointer column, this is a hidden storage layer column
     if (col_id != VERSION_POINTER_COLUMN_ID) {
-      col_oids.emplace_back(sql_table->OidForColId(col_id));
-      //byte *raw_bytes = redo_record->Delta()->AccessWithNullCheck(i);
-      //parser::ConstantValueExpression cve;
-      //reinterpret_cast<const T *>(raw_bytes);
-      STORAGE_LOG_ERROR(fmt::format("col: {}", sql_table->OidForColId(col_id)));
+      catalog::col_oid_t col_oid = sql_table->OidForColId(col_id);
+      type::TypeId value_type = col_types[col_oid];
+      const auto type_id = execution::sql::GetTypeId(value_type);
+      byte *raw_bytes = redo_record->Delta()->AccessWithNullCheck(i);
+      common::ManagedPointer<parser::AbstractExpression> expr;
+      if (raw_bytes == nullptr) {
+        expr = expr_maker.Constant();
+      } else {
+        switch (type_id) {
+          case execution::sql::TypeId::Boolean:
+            expr = expr_maker.Constant(*(reinterpret_cast<bool *>(raw_bytes)));
+            break;
+          case execution::sql::TypeId::TinyInt:
+          case execution::sql::TypeId::SmallInt:
+          case execution::sql::TypeId::Integer:
+          case execution::sql::TypeId::BigInt:
+            expr = expr_maker.Constant(*(reinterpret_cast<int32_t *>(raw_bytes)));
+            break;
+          case execution::sql::TypeId::Float:
+          case execution::sql::TypeId::Double:
+            expr = expr_maker.Constant(*(reinterpret_cast<double *>(raw_bytes)));
+            break;
+          case execution::sql::TypeId::Date:
+          case execution::sql::TypeId::Timestamp:
+          case execution::sql::TypeId::Varchar:
+            expr = expr_maker.Constant(*(reinterpret_cast<std::string *>(raw_bytes)));
+            break;
+          default:
+            throw NOT_IMPLEMENTED_EXCEPTION(fmt::format("Translation of constant type {}", TypeIdToString(type_id)));
+        }
+      }
+      values.push_back(expr);
     }
-  }*/
-  
-  std::vector<common::ManagedPointer<parser::AbstractExpression>> values;
-  for (const auto &col : schema.GetColumns()) {
-    plan_builder.AddParameterInfo(col.Oid());
-    common::ManagedPointer<parser::AbstractExpression> expression;
-    expression = col.StoredExpressionNotConst();
-    //const auto &val = static_cast<parser::ConstantValueExpression &>(*expression);
-    //const auto type_id = execution::sql::GetTypeId(val.GetReturnValueType());
-    //STORAGE_LOG_ERROR(fmt::format("col: {}, type_id: {}", col.Oid(), type_id));
-    values.push_back(expression);
   }
   plan_builder.AddValues(std::move(values));
 
@@ -1178,26 +1194,24 @@ void RecoveryManager::InsertRedoRecordToInsertTranslator(transaction::Transactio
   std::vector<catalog::index_oid_t> index_oids = accessor->GetIndexOids(redo_record->GetTableOid());
 
   // If there's no indexes on the table, we can return
-  if (index_oids.empty()) return;
+  // if (index_oids.empty()) return;
   plan_builder.SetIndexOids(std::move(index_oids));
 
   // Q4. Insert type. How do I retrieve them? Could be values/select.
   plan_builder.SetInsertType(parser::InsertType::VALUES);
-  plan_builder.SetOutputSchema(std::make_unique<planner::OutputSchema>());
+  plan_builder.SetOutputSchema(std::make_unique<planner::OutputSchema>(std::move(cols)));
   
   std::unique_ptr<planner::InsertPlanNode> out_plan = plan_builder.Build();
 
   // Compile the plannode.
   auto exec_query = execution::compiler::CompilationContext::Compile(*out_plan, exec_settings, accessor.get(),
                                                                      execution::compiler::CompilationMode::OneShot);
-  execution::exec::NoOpResultConsumer consumer;
-  execution::exec::OutputCallback callback = consumer;
+
+  execution::exec::OutputCallback callback = InsertCallback;
   auto exec_ctx = std::make_unique<execution::exec::ExecutionContext>(
       redo_record->GetDatabaseOid(), common::ManagedPointer<transaction::TransactionContext>(txn), callback,
                                         out_plan->GetOutputSchema().Get(), common::ManagedPointer<catalog::CatalogAccessor>(accessor), exec_settings, DISABLED, DISABLED, DISABLED);
-  exec_query->Run(common::ManagedPointer(exec_ctx));
-
-  //txn_manager_->Commit(txn, transaction::TransactionUtil::EmptyCallback, nullptr);
+  exec_query->Run(common::ManagedPointer(exec_ctx), execution::vm::ExecutionMode::Interpret);
 }
 
 }  // namespace noisepage::storage

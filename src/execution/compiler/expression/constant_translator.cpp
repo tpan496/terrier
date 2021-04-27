@@ -18,7 +18,7 @@ ast::Expr *ConstantTranslator::DeriveValue(WorkContext *ctx, const ColumnValuePr
   auto *codegen = GetCodeGen();
   const auto &val = GetExpressionAs<const parser::ConstantValueExpression>();
   const auto type_id = sql::GetTypeId(val.GetReturnValueType());
-  EXECUTION_LOG_ERROR(fmt::format("Is Null: {}", val.IsNull()));
+  //EXECUTION_LOG_ERROR(fmt::format("type_id: {}, Is Null: {}", type_id, val.IsNull()));
   if (val.IsNull()) {
     return codegen->ConstNull(val.GetReturnValueType());
   }

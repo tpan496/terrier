@@ -241,6 +241,22 @@ class RecoveryTests : public TerrierTest {
 // This test inserts some tuples into a single table. It then recreates the test table from
 // the log, and verifies that this new table is the same as the original table
 // NOLINTNEXTLINE
+TEST_F(RecoveryTests, SingleTableInsertTest) {
+  LargeSqlTableTestConfiguration config = LargeSqlTableTestConfiguration::Builder()
+      .SetNumDatabases(1)
+      .SetNumTables(1)
+      .SetMaxColumns(5)
+      .SetInitialTableSize(100)
+      .SetTxnLength(5)
+      .SetInsertUpdateSelectDeleteRatio({1.0, 0.0, 0.0, 0.0})
+      .SetVarlenAllowed(false)
+      .Build();
+  RecoveryTests::RunTest(config);
+}
+
+// This test inserts some tuples into a single table. It then recreates the test table from
+// the log, and verifies that this new table is the same as the original table
+// NOLINTNEXTLINE
 TEST_F(RecoveryTests, SingleTableTest) {
   LargeSqlTableTestConfiguration config = LargeSqlTableTestConfiguration::Builder()
                                               .SetNumDatabases(1)

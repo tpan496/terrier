@@ -106,7 +106,8 @@ BENCHMARK_DEFINE_F(RecoveryBenchmark, ReadWriteWorkload)(benchmark::State &state
                                               .SetMaxColumns(5)
                                               .SetInitialTableSize(initial_table_size_)
                                               .SetTxnLength(5)
-                                              .SetInsertUpdateSelectDeleteRatio({0.5, 0.0, 0.5, 0.0})
+                                              //.SetInsertUpdateSelectDeleteRatio({0.5, 0.0, 0.5, 0.0})
+                                              .SetInsertUpdateSelectDeleteRatio({1.0, 0.0, 0.0, 0.0})
                                               .SetVarlenAllowed(true)
                                               .Build();
 
