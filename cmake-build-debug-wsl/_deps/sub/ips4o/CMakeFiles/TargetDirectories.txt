@@ -1,3 +1,0 @@
-/mnt/c/private/noisepage/cmake-build-debug-wsl/_deps/sub/ips4o/CMakeFiles/rebuild_cache.dir
-/mnt/c/private/noisepage/cmake-build-debug-wsl/_deps/sub/ips4o/CMakeFiles/edit_cache.dir
-/mnt/c/private/noisepage/cmake-build-debug-wsl/_deps/sub/ips4o/CMakeFiles/ips4o-populate.dir

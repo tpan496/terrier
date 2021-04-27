@@ -1,3 +1,0 @@
-/mnt/c/private/noisepage/cmake-build-debug-wsl/_deps/sub/gflags/CMakeFiles/edit_cache.dir
-/mnt/c/private/noisepage/cmake-build-debug-wsl/_deps/sub/gflags/CMakeFiles/rebuild_cache.dir
-/mnt/c/private/noisepage/cmake-build-debug-wsl/_deps/sub/gflags/CMakeFiles/gflags-populate.dir

@@ -1,3 +1,0 @@
-/mnt/c/private/noisepage/cmake-build-debug-wsl/_deps/sub/fast_float/CMakeFiles/rebuild_cache.dir
-/mnt/c/private/noisepage/cmake-build-debug-wsl/_deps/sub/fast_float/CMakeFiles/edit_cache.dir
-/mnt/c/private/noisepage/cmake-build-debug-wsl/_deps/sub/fast_float/CMakeFiles/fast_float-populate.dir

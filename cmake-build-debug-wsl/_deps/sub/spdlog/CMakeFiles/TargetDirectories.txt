@@ -1,3 +1,0 @@
-/mnt/c/private/noisepage/cmake-build-debug-wsl/_deps/sub/spdlog/CMakeFiles/rebuild_cache.dir
-/mnt/c/private/noisepage/cmake-build-debug-wsl/_deps/sub/spdlog/CMakeFiles/edit_cache.dir
-/mnt/c/private/noisepage/cmake-build-debug-wsl/_deps/sub/spdlog/CMakeFiles/spdlog-populate.dir
