@@ -1,0 +1,46 @@
+{
+	"sources" : 
+	[
+		{
+			"file" : "/mnt/c/private/noisepage/cmake-build-debug-wsl/_deps/sub/gflags/CMakeFiles/gflags-populate"
+		},
+		{
+			"file" : "/mnt/c/private/noisepage/cmake-build-debug-wsl/_deps/sub/gflags/CMakeFiles/gflags-populate.rule"
+		},
+		{
+			"file" : "/mnt/c/private/noisepage/cmake-build-debug-wsl/_deps/sub/gflags/CMakeFiles/gflags-populate-complete.rule"
+		},
+		{
+			"file" : "/mnt/c/private/noisepage/cmake-build-debug-wsl/_deps/sub/gflags/gflags-populate-prefix/src/gflags-populate-stamp/gflags-populate-install.rule"
+		},
+		{
+			"file" : "/mnt/c/private/noisepage/cmake-build-debug-wsl/_deps/sub/gflags/gflags-populate-prefix/src/gflags-populate-stamp/gflags-populate-mkdir.rule"
+		},
+		{
+			"file" : "/mnt/c/private/noisepage/cmake-build-debug-wsl/_deps/sub/gflags/gflags-populate-prefix/src/gflags-populate-stamp/gflags-populate-download.rule"
+		},
+		{
+			"file" : "/mnt/c/private/noisepage/cmake-build-debug-wsl/_deps/sub/gflags/gflags-populate-prefix/src/gflags-populate-stamp/gflags-populate-update.rule"
+		},
+		{
+			"file" : "/mnt/c/private/noisepage/cmake-build-debug-wsl/_deps/sub/gflags/gflags-populate-prefix/src/gflags-populate-stamp/gflags-populate-patch.rule"
+		},
+		{
+			"file" : "/mnt/c/private/noisepage/cmake-build-debug-wsl/_deps/sub/gflags/gflags-populate-prefix/src/gflags-populate-stamp/gflags-populate-configure.rule"
+		},
+		{
+			"file" : "/mnt/c/private/noisepage/cmake-build-debug-wsl/_deps/sub/gflags/gflags-populate-prefix/src/gflags-populate-stamp/gflags-populate-build.rule"
+		},
+		{
+			"file" : "/mnt/c/private/noisepage/cmake-build-debug-wsl/_deps/sub/gflags/gflags-populate-prefix/src/gflags-populate-stamp/gflags-populate-test.rule"
+		}
+	],
+	"target" : 
+	{
+		"labels" : 
+		[
+			"gflags-populate"
+		],
+		"name" : "gflags-populate"
+	}
+}

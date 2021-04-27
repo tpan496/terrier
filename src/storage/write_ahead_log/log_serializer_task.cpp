@@ -9,6 +9,7 @@
 #include "replication/primary_replication_manager.h"
 #include "transaction/transaction_context.h"
 #include "transaction/transaction_manager.h"
+#include "loggers/storage_logger.h"
 
 namespace noisepage::storage {
 
@@ -261,6 +262,8 @@ uint64_t LogSerializerTask::SerializeRecord(const noisepage::storage::LogRecord 
       num_bytes += WriteValue(record_body->GetDatabaseOid());
       num_bytes += WriteValue(record_body->GetTableOid());
       num_bytes += WriteValue(record_body->GetTupleSlot());
+      //STORAGE_LOG_ERROR(fmt::format("Type: REDO, TxnBegin: {}, DatabaseOid: {}, TableOid: {}", record.TxnBegin(),
+      //                              record_body->GetDatabaseOid(), record_body->GetTableOid()));
 
       auto *delta = record_body->Delta();
       // Write out which column ids this redo record is concerned with. On recovery, we can construct the appropriate
@@ -312,6 +315,7 @@ uint64_t LogSerializerTask::SerializeRecord(const noisepage::storage::LogRecord 
       break;
     }
     case LogRecordType::DELETE: {
+      //STORAGE_LOG_ERROR(fmt::format("Type: DELETE"));
       auto *record_body = record.GetUnderlyingRecordBodyAs<DeleteRecord>();
       num_bytes += WriteValue(record_body->GetDatabaseOid());
       num_bytes += WriteValue(record_body->GetTableOid());
@@ -319,6 +323,7 @@ uint64_t LogSerializerTask::SerializeRecord(const noisepage::storage::LogRecord 
       break;
     }
     case LogRecordType::COMMIT: {
+      //STORAGE_LOG_ERROR(fmt::format("Type: COMMIT"));
       auto *record_body = record.GetUnderlyingRecordBodyAs<CommitRecord>();
       num_bytes += WriteValue(record_body->CommitTime());
       num_bytes += WriteValue(record_body->OldestActiveTxn());

@@ -417,6 +417,8 @@ class RecoveryManager : public common::DedicatedThreadOwner {
   const catalog::Schema &GetTableSchema(transaction::TransactionContext *txn,
                                         const common::ManagedPointer<catalog::DatabaseCatalog> &db_catalog,
                                         catalog::table_oid_t table_oid) const;
+  
+  bool IsSpecialPGTables(catalog::table_oid_t table_oid);
 
   void InsertRedoRecordToInsertTranslator(transaction::TransactionContext *txn,
                                           common::ManagedPointer<storage::SqlTable> sql_table,

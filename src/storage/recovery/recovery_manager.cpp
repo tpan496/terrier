@@ -34,6 +34,7 @@
 #include "planner/plannodes/output_schema.h"
 #include "planner/plannodes/insert_plan_node.h"
 #include "execution/compiler/expression/expression_translator.h"
+#include "execution/exec/execution_context.h"
 
 namespace noisepage::storage {
 
@@ -134,11 +135,10 @@ void RecoveryManager::ProcessCommittedTransaction(noisepage::transaction::timest
     NOISEPAGE_ASSERT(
         buffered_record->RecordType() == LogRecordType::REDO || buffered_record->RecordType() == LogRecordType::DELETE,
         "Buffered record must be a redo or delete.");
-
     if (IsSpecialCaseCatalogRecord(buffered_record)) {
       idx += ProcessSpecialCaseCatalogRecord(txn, &buffered_changes_map_[txn_id], idx);
     } else if (buffered_record->RecordType() == LogRecordType::REDO) {
-      STORAGE_LOG_ERROR("Process Committed Transaction");
+      // STORAGE_LOG_ERROR("Process Committed Transaction");
       ReplayRedoRecord(txn, buffered_record);
     } else {
       ReplayDeleteRecord(txn, buffered_record);
@@ -197,11 +197,33 @@ uint32_t RecoveryManager::ProcessDeferredTransactions(noisepage::transaction::ti
   return txns_processed;
 }
 
+bool RecoveryManager::IsSpecialPGTables(catalog::table_oid_t table_oid) {
+  return table_oid == catalog::postgres::PgAttribute::COLUMN_TABLE_OID ||
+         table_oid == catalog::postgres::PgNamespace::NAMESPACE_TABLE_OID ||
+         table_oid == catalog::postgres::PgClass::CLASS_TABLE_OID ||
+         table_oid == catalog::postgres::PgIndex::INDEX_TABLE_OID ||
+         table_oid == catalog::postgres::PgType::TYPE_TABLE_OID ||
+         table_oid == catalog::postgres::PgConstraint::CONSTRAINT_TABLE_OID ||
+         table_oid == catalog::postgres::PgDatabase::DATABASE_TABLE_OID ||
+         table_oid == catalog::postgres::PgLanguage::LANGUAGE_TABLE_OID ||
+         table_oid == catalog::postgres::PgProc::PRO_TABLE_OID ||
+         table_oid == catalog::postgres::PgStatistic::STATISTIC_TABLE_OID;
+}
+
 void RecoveryManager::ReplayRedoRecord(transaction::TransactionContext *txn, LogRecord *record) {
   auto *redo_record = record->GetUnderlyingRecordBodyAs<RedoRecord>();
+  //STORAGE_LOG_ERROR(
+  //    fmt::format("DatabaseOid: {}, TableOid: {}", redo_record->GetDatabaseOid(), redo_record->GetTableOid()));
   auto sql_table_ptr = GetSqlTable(txn, redo_record->GetDatabaseOid(), redo_record->GetTableOid());
   if (IsInsertRecord(redo_record)) {
-    STORAGE_LOG_ERROR("Insert Record");
+    //STORAGE_LOG_ERROR("Insert Record");
+    /*auto table_oid = redo_record->GetTableOid();
+    if (IsSpecialPGTables(table_oid)) {
+      //STORAGE_LOG_ERROR("PG Tables");
+    } else {
+      InsertRedoRecordToInsertTranslator(txn, sql_table_ptr, redo_record);
+      return;
+    }*/
     // Save the old tuple slot, and reset the tuple slot in the record
     auto old_tuple_slot = redo_record->GetTupleSlot();
     redo_record->SetTupleSlot(TupleSlot(nullptr, 0));
@@ -219,18 +241,8 @@ void RecoveryManager::ReplayRedoRecord(transaction::TransactionContext *txn, Log
                      "Insert should update redo record with new tuple slot");
     // Create a mapping of the old to new tuple. The new tuple slot should be used for future updates and deletes.
     tuple_slot_map_[old_tuple_slot] = new_tuple_slot;
-    auto db_catalog_ptr = GetDatabaseCatalog(txn, redo_record->GetDatabaseOid());
-    const auto &schema = GetTableSchema(txn, db_catalog_ptr, redo_record->GetTableOid());
-    for (const auto &col : schema.GetColumns()) {
-      common::ManagedPointer<parser::AbstractExpression> expression;
-      expression = col.StoredExpressionNotConst();
-      const auto &val = static_cast<parser::ConstantValueExpression &>(*expression);
-      const auto type_id = execution::sql::GetTypeId(val.GetReturnValueType());
-      STORAGE_LOG_ERROR(fmt::format("col: {}, type_id: {}", col.Oid(), type_id));
-    }
-    //InsertRedoRecordToInsertTranslator(txn, sql_table_ptr, redo_record);
   } else {
-    STORAGE_LOG_ERROR("Non-Insert Record");
+    // STORAGE_LOG_ERROR("Non-Insert Record");
     auto new_tuple_slot = tuple_slot_map_[redo_record->GetTupleSlot()];
     redo_record->SetTupleSlot(new_tuple_slot);
     // Stage the write. This way the recovery operation is logged if logging is enabled
@@ -433,6 +445,7 @@ void RecoveryManager::UpdateIndexesOnTable(transaction::TransactionContext *txn,
 uint32_t RecoveryManager::ProcessSpecialCaseCatalogRecord(
     transaction::TransactionContext *txn, std::vector<std::pair<LogRecord *, std::vector<byte *>>> *buffered_changes,
     uint32_t start_idx) {
+  // STORAGE_LOG_ERROR("Process Special Case Catalog Record");
   auto *curr_record = buffered_changes->at(start_idx).first;
   NOISEPAGE_ASSERT(
       curr_record->RecordType() == LogRecordType::REDO || curr_record->RecordType() == LogRecordType::DELETE,
@@ -639,7 +652,7 @@ uint32_t RecoveryManager::ProcessSpecialCasePGClassRecord(
 
     switch (updated_pg_class_oid.UnderlyingValue()) {
       case (catalog::postgres::PgClass::REL_NEXTCOLOID.oid_.UnderlyingValue()): {  // Case 1
-        STORAGE_LOG_ERROR("Process Special Case PG Class Record");
+        // STORAGE_LOG_ERROR("Process Special Case PG Class Record");
         ReplayRedoRecord(txn, curr_record);
         return 0;  // No additional logs processed
       }
@@ -1063,7 +1076,7 @@ uint32_t RecoveryManager::ProcessSpecialCasePGProcRecord(
   if (curr_record->RecordType() == LogRecordType::REDO) {
     auto *redo_record = curr_record->GetUnderlyingRecordBodyAs<RedoRecord>();
     if (IsInsertRecord(redo_record)) {
-      STORAGE_LOG_ERROR("Process Special Case PG Proc Record");
+      // STORAGE_LOG_ERROR("Process Special Case PG Proc Record");
       ReplayRedoRecord(txn, curr_record);
     } else {
       return 0;
@@ -1152,9 +1165,9 @@ void RecoveryManager::InsertRedoRecordToInsertTranslator(transaction::Transactio
     plan_builder.AddParameterInfo(col.Oid());
     common::ManagedPointer<parser::AbstractExpression> expression;
     expression = col.StoredExpressionNotConst();
-    const auto &val = static_cast<parser::ConstantValueExpression &>(*expression);
-    const auto type_id = execution::sql::GetTypeId(val.GetReturnValueType());
-    STORAGE_LOG_ERROR(fmt::format("col: {}, type_id: {}", col.Oid(), type_id));
+    //const auto &val = static_cast<parser::ConstantValueExpression &>(*expression);
+    //const auto type_id = execution::sql::GetTypeId(val.GetReturnValueType());
+    //STORAGE_LOG_ERROR(fmt::format("col: {}, type_id: {}", col.Oid(), type_id));
     values.push_back(expression);
   }
   plan_builder.AddValues(std::move(values));
@@ -1177,6 +1190,12 @@ void RecoveryManager::InsertRedoRecordToInsertTranslator(transaction::Transactio
   // Compile the plannode.
   auto exec_query = execution::compiler::CompilationContext::Compile(*out_plan, exec_settings, accessor.get(),
                                                                      execution::compiler::CompilationMode::OneShot);
+  execution::exec::NoOpResultConsumer consumer;
+  execution::exec::OutputCallback callback = consumer;
+  auto exec_ctx = std::make_unique<execution::exec::ExecutionContext>(
+      redo_record->GetDatabaseOid(), common::ManagedPointer<transaction::TransactionContext>(txn), callback,
+                                        out_plan->GetOutputSchema().Get(), common::ManagedPointer<catalog::CatalogAccessor>(accessor), exec_settings, DISABLED, DISABLED, DISABLED);
+  exec_query->Run(common::ManagedPointer(exec_ctx));
 
   //txn_manager_->Commit(txn, transaction::TransactionUtil::EmptyCallback, nullptr);
 }

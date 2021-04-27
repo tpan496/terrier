@@ -1,0 +1,14 @@
+# Target labels
+ madoka-populate
+# Source files and their labels
+/mnt/c/private/noisepage/cmake-build-debug-wsl/_deps/sub/madoka/CMakeFiles/madoka-populate
+/mnt/c/private/noisepage/cmake-build-debug-wsl/_deps/sub/madoka/CMakeFiles/madoka-populate.rule
+/mnt/c/private/noisepage/cmake-build-debug-wsl/_deps/sub/madoka/CMakeFiles/madoka-populate-complete.rule
+/mnt/c/private/noisepage/cmake-build-debug-wsl/_deps/sub/madoka/madoka-populate-prefix/src/madoka-populate-stamp/madoka-populate-install.rule
+/mnt/c/private/noisepage/cmake-build-debug-wsl/_deps/sub/madoka/madoka-populate-prefix/src/madoka-populate-stamp/madoka-populate-mkdir.rule
+/mnt/c/private/noisepage/cmake-build-debug-wsl/_deps/sub/madoka/madoka-populate-prefix/src/madoka-populate-stamp/madoka-populate-download.rule
+/mnt/c/private/noisepage/cmake-build-debug-wsl/_deps/sub/madoka/madoka-populate-prefix/src/madoka-populate-stamp/madoka-populate-update.rule
+/mnt/c/private/noisepage/cmake-build-debug-wsl/_deps/sub/madoka/madoka-populate-prefix/src/madoka-populate-stamp/madoka-populate-patch.rule
+/mnt/c/private/noisepage/cmake-build-debug-wsl/_deps/sub/madoka/madoka-populate-prefix/src/madoka-populate-stamp/madoka-populate-configure.rule
+/mnt/c/private/noisepage/cmake-build-debug-wsl/_deps/sub/madoka/madoka-populate-prefix/src/madoka-populate-stamp/madoka-populate-build.rule
+/mnt/c/private/noisepage/cmake-build-debug-wsl/_deps/sub/madoka/madoka-populate-prefix/src/madoka-populate-stamp/madoka-populate-test.rule

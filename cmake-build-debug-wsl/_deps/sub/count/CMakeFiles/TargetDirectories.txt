@@ -1,0 +1,3 @@
+/mnt/c/private/noisepage/cmake-build-debug-wsl/_deps/sub/count/CMakeFiles/rebuild_cache.dir
+/mnt/c/private/noisepage/cmake-build-debug-wsl/_deps/sub/count/CMakeFiles/edit_cache.dir
+/mnt/c/private/noisepage/cmake-build-debug-wsl/_deps/sub/count/CMakeFiles/count-populate.dir

@@ -1,0 +1,46 @@
+{
+	"sources" : 
+	[
+		{
+			"file" : "/mnt/c/private/noisepage/cmake-build-debug-wsl/_deps/sub/count/CMakeFiles/count-populate"
+		},
+		{
+			"file" : "/mnt/c/private/noisepage/cmake-build-debug-wsl/_deps/sub/count/CMakeFiles/count-populate.rule"
+		},
+		{
+			"file" : "/mnt/c/private/noisepage/cmake-build-debug-wsl/_deps/sub/count/CMakeFiles/count-populate-complete.rule"
+		},
+		{
+			"file" : "/mnt/c/private/noisepage/cmake-build-debug-wsl/_deps/sub/count/count-populate-prefix/src/count-populate-stamp/count-populate-install.rule"
+		},
+		{
+			"file" : "/mnt/c/private/noisepage/cmake-build-debug-wsl/_deps/sub/count/count-populate-prefix/src/count-populate-stamp/count-populate-mkdir.rule"
+		},
+		{
+			"file" : "/mnt/c/private/noisepage/cmake-build-debug-wsl/_deps/sub/count/count-populate-prefix/src/count-populate-stamp/count-populate-download.rule"
+		},
+		{
+			"file" : "/mnt/c/private/noisepage/cmake-build-debug-wsl/_deps/sub/count/count-populate-prefix/src/count-populate-stamp/count-populate-update.rule"
+		},
+		{
+			"file" : "/mnt/c/private/noisepage/cmake-build-debug-wsl/_deps/sub/count/count-populate-prefix/src/count-populate-stamp/count-populate-patch.rule"
+		},
+		{
+			"file" : "/mnt/c/private/noisepage/cmake-build-debug-wsl/_deps/sub/count/count-populate-prefix/src/count-populate-stamp/count-populate-configure.rule"
+		},
+		{
+			"file" : "/mnt/c/private/noisepage/cmake-build-debug-wsl/_deps/sub/count/count-populate-prefix/src/count-populate-stamp/count-populate-build.rule"
+		},
+		{
+			"file" : "/mnt/c/private/noisepage/cmake-build-debug-wsl/_deps/sub/count/count-populate-prefix/src/count-populate-stamp/count-populate-test.rule"
+		}
+	],
+	"target" : 
+	{
+		"labels" : 
+		[
+			"count-populate"
+		],
+		"name" : "count-populate"
+	}
+}
