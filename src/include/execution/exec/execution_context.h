@@ -41,6 +41,10 @@ namespace noisepage::storage {
 class RecoveryManager;
 }  // namespace noisepage::storage
 
+namespace noisepage::execution::sql {
+class StorageInterface;
+} // namespace noisepage::execution::sql
+
 namespace noisepage::execution::exec {
 class ExecutionSettings;
 /**
@@ -335,6 +339,17 @@ class EXPORT ExecutionContext {
    */
   void ClearHooks() { hooks_.clear(); }
 
+  /**
+   * Sets the tuple slot used for an Insert.
+   */
+  void SetTupleSlot(storage::TupleSlot tuple_slot) { tuple_slot_ = tuple_slot; }
+
+  /**
+   * Gets the tuple slot used for an Insert.
+   * @return tuple slot
+   */
+  storage::TupleSlot GetTupleSlot() { return tuple_slot_; }
+
  private:
   query_id_t query_id_{execution::query_id_t(0)};
   exec::ExecutionSettings exec_settings_;
@@ -366,5 +381,6 @@ class EXPORT ExecutionContext {
   uint32_t num_concurrent_estimate_ = 0;
   std::vector<HookFn> hooks_{};
   void *query_state_;
+  storage::TupleSlot tuple_slot_;
 };
 }  // namespace noisepage::execution::exec

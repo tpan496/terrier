@@ -18,21 +18,23 @@ ast::Expr *ConstantTranslator::DeriveValue(WorkContext *ctx, const ColumnValuePr
   auto *codegen = GetCodeGen();
   const auto &val = GetExpressionAs<const parser::ConstantValueExpression>();
   const auto type_id = sql::GetTypeId(val.GetReturnValueType());
-  //EXECUTION_LOG_ERROR(fmt::format("type_id: {}, Is Null: {}", type_id, val.IsNull()));
   if (val.IsNull()) {
     return codegen->ConstNull(val.GetReturnValueType());
   }
 
   switch (type_id) {
     case sql::TypeId::Boolean:
+      EXECUTION_LOG_ERROR(fmt::format("Type: Boolean"));
       return codegen->BoolToSql(val.GetBoolVal().val_);
     case sql::TypeId::TinyInt:
     case sql::TypeId::SmallInt:
     case sql::TypeId::Integer:
     case sql::TypeId::BigInt:
+      EXECUTION_LOG_ERROR(fmt::format("Type: Integer"));
       return codegen->IntToSql(val.GetInteger().val_);
     case sql::TypeId::Float:
     case sql::TypeId::Double:
+      EXECUTION_LOG_ERROR(fmt::format("Type: Double"));
       return codegen->FloatToSql(val.GetReal().val_);
     case sql::TypeId::Date:
       return codegen->DateToSql(val.GetDateVal().val_);

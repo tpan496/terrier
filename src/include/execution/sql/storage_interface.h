@@ -17,6 +17,10 @@ class Index;
 
 }  // namespace noisepage::storage
 
+namespace execution::vm {
+class VM;
+} // namespace noisepage::execution::vm
+
 namespace noisepage::execution {
 
 namespace exec {
@@ -110,6 +114,12 @@ class EXPORT StorageInterface {
    * @returns index heap size
    */
   uint32_t GetIndexHeapSize();
+
+  /**
+   * Retrieves execution context.
+   * @return execution context
+   */
+  exec::ExecutionContext* GetExecutionContext() { return exec_ctx_; }
 
  protected:
   /**

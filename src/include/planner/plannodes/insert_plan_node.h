@@ -51,6 +51,19 @@ class InsertPlanNode : public AbstractPlanNode {
     }
 
     /**
+     * @param value value to insert
+     * @return builder object
+     */
+    Builder &AddValue(common::ManagedPointer<parser::AbstractExpression> &&value) {
+      if (values_.empty()) {
+        values_.push_back({value});
+      } else {
+        values_[0].emplace_back(value);
+      }
+      return *this;
+    }
+
+    /**
      * @param values values to insert
      * @return builder object
      */

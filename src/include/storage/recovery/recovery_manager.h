@@ -71,13 +71,21 @@ class ExpressionMaker {
   /**
    * Create an integer constant expression
    */
-  ManagedExpression Constant(int32_t val) {
+  ManagedExpression Constant(int64_t val) {
     return MakeManaged(
         std::make_unique<parser::ConstantValueExpression>(type::TypeId::INTEGER, execution::sql::Integer(val)));
   }
 
   /**
    * Create a floating point constant expression
+   */
+  ManagedExpression Constant(float val) {
+    return MakeManaged(
+        std::make_unique<parser::ConstantValueExpression>(type::TypeId::REAL, execution::sql::Real(val)));
+  }
+
+  /**
+   * Create a double constant expression
    */
   ManagedExpression Constant(double val) {
     return MakeManaged(
