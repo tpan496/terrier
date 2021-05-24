@@ -71,18 +71,12 @@ class ExpressionMaker {
   /**
    * Create an integer constant expression
    */
-  ManagedExpression Constant(int64_t val) {
+  ManagedExpression Constant(type::TypeId integer_type, int64_t val) {
     return MakeManaged(
-        std::make_unique<parser::ConstantValueExpression>(type::TypeId::INTEGER, execution::sql::Integer(val)));
+        std::make_unique<parser::ConstantValueExpression>(integer_type, execution::sql::Integer(val)));
   }
 
-  /**
-   * Create a floating point constant expression
-   */
-  ManagedExpression Constant(float val) {
-    return MakeManaged(
-        std::make_unique<parser::ConstantValueExpression>(type::TypeId::REAL, execution::sql::Real(val)));
-  }
+
 
   /**
    * Create a double constant expression
@@ -95,18 +89,25 @@ class ExpressionMaker {
   /**
    * Create a string constant expression
    */
-  ManagedExpression Constant(const std::string &str) {
-    auto string_val = execution::sql::ValueUtil::CreateStringVal(str);
-    return MakeManaged(std::make_unique<parser::ConstantValueExpression>(type::TypeId::VARCHAR, string_val.first,
-                                                                         std::move(string_val.second)));
+  ManagedExpression Constant(const storage::VarlenEntry entry) {
+    auto string_val = execution::sql::ValueUtil::CreateStringVal(entry);
+    return MakeManaged(std::make_unique<parser::ConstantValueExpression>(type::TypeId::VARCHAR, string_val.first, std::move(string_val.second)));
   }
 
   /**
    * Create a date constant expression
    */
-  ManagedExpression Constant(int32_t year, uint32_t month, uint32_t day) {
+  ManagedExpression Constant(const execution::sql::Date date) {
     return MakeManaged(std::make_unique<parser::ConstantValueExpression>(
-        type::TypeId::DATE, execution::sql::DateVal(execution::sql::Date::FromYMD(year, month, day))));
+        type::TypeId::DATE, execution::sql::DateVal(date)));
+  }
+
+  /**
+   * Create a timestamp constant expression
+   */
+  ManagedExpression Constant(const execution::sql::Timestamp ts) {
+    return MakeManaged(std::make_unique<parser::ConstantValueExpression>(
+        type::TypeId::DATE, execution::sql::TimestampVal(ts)));
   }
  private:
   // To ease memory management

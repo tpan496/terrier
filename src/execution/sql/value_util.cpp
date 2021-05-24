@@ -16,6 +16,18 @@ std::pair<StringVal, std::unique_ptr<byte[]>> ValueUtil::CreateStringVal(
   return {StringVal(reinterpret_cast<const char *>(buffer.get()), length), std::move(buffer)};
 }
 
+std::pair<StringVal, std::unique_ptr<byte[]>> ValueUtil::CreateStringVal(
+    storage::VarlenEntry entry) {
+  if (entry.IsInlined()) {
+    return {StringVal(entry), nullptr};
+  }
+
+  uint32_t buffer_size = entry.Size();
+  auto buffer = std::unique_ptr<byte[]>(common::AllocationUtil::AllocateAligned(buffer_size));
+  std::memcpy(buffer.get(), entry.Content(), buffer_size);
+  return {StringVal(entry), std::move(buffer)};
+}
+
 std::pair<StringVal, std::unique_ptr<byte[]>> ValueUtil::CreateStringVal(const std::string &string) {
   return CreateStringVal(common::ManagedPointer(string.data()), string.length());
 }

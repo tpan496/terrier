@@ -6,6 +6,8 @@
 #include "execution/vm/bytecode_function_info.h"
 #include "execution/vm/bytecodes.h"
 
+#include "loggers/execution_logger.h"
+
 namespace noisepage::execution::vm {
 
 class BytecodeLabel;
@@ -420,6 +422,8 @@ class BytecodeEmitter {
   /** Copy a scalar immediate value into the bytecode stream */
   template <typename T>
   auto EmitScalarValue(const T val) -> std::enable_if_t<std::is_arithmetic_v<T>> {
+
+
     bytecode_->insert(bytecode_->end(), sizeof(T), 0);
     *reinterpret_cast<T *>(&*(bytecode_->end() - sizeof(T))) = val;
   }

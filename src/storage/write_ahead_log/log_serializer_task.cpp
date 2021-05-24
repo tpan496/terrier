@@ -310,6 +310,7 @@ uint64_t LogSerializerTask::SerializeRecord(const noisepage::storage::LogRecord 
           // Note that by writing out AttrSize(col_id) bytes instead of just the difference between successive offsets
           // of the delta record, we avoid serializing out any potential padding.
           num_bytes += WriteValue(column_value_address, block_layout.AttrSize(col_id));
+          //STORAGE_LOG_ERROR("[LG] Col: {}, Double: {}", col_id, *(reinterpret_cast<const double *>(column_value_address)));
         }
       }
       break;

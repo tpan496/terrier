@@ -17,6 +17,8 @@
 #include "loggers/execution_logger.h"
 #include "spdlog/fmt/fmt.h"
 
+#include "execution/ast/ast_pretty_print.h"
+
 namespace noisepage::execution::vm {
 
 /**
@@ -540,6 +542,8 @@ void BytecodeGenerator::VisitSqlConversionCall(ast::CallExpr *call, ast::Builtin
     }
     case ast::Builtin::FloatToSql: {
       auto input = VisitExpressionForRValue(call->Arguments()[0]);
+      EXECUTION_LOG_ERROR("[BytecodeGenerator] FloatToSql");
+      ast::AstPrettyPrint::Dump(std::cout, call->Arguments()[0]);
       GetEmitter()->Emit(Bytecode::InitReal, dest, input);
       break;
     }

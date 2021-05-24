@@ -5,6 +5,7 @@
 #include <utility>
 
 #include "common/strong_typedef.h"
+#include "storage/storage_defs.h"
 
 namespace noisepage::execution::sql {
 
@@ -25,6 +26,7 @@ class ValueUtil {
    */
   static std::pair<StringVal, std::unique_ptr<byte[]>> CreateStringVal(common::ManagedPointer<const char> string,
                                                                        uint32_t length);
+  static std::pair<StringVal, std::unique_ptr<byte[]>> CreateStringVal(storage::VarlenEntry entry);
   /**
    * Construct a StringVal, optionally allocating a byte buffer if the input can't be inlined.
    * @param string input
@@ -43,6 +45,8 @@ class ValueUtil {
    * @return a pair of owned pointers, first to the StringVal and second to an optionally-allocated buffer
    */
   static std::pair<StringVal, std::unique_ptr<byte[]>> CreateStringVal(StringVal string);
+  template <typename _Tp>
+  std::pair<StringVal, std::unique_ptr<byte[]>> CreateStringVal(const storage::VarlenEntry entry);
 };
 
 }  // namespace noisepage::execution::sql

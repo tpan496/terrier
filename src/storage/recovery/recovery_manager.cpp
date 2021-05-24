@@ -1115,7 +1115,7 @@ const catalog::Schema &RecoveryManager::GetTableSchema(
 void dos(void *stuff) {}
 
 void InsertCallback (byte* tuples, uint32_t num_tuples, uint32_t tuple_size) {
-  STORAGE_LOG_ERROR(fmt::format("num_tuples: {}, tuple_size: {}", num_tuples, tuple_size));
+  STORAGE_LOG_ERROR("num_tuples: {}, tuple_size: {}", num_tuples, tuple_size);
 }
 
 void RecoveryManager::InsertRedoRecordToInsertTranslator(transaction::TransactionContext *txn,
@@ -1142,17 +1142,16 @@ void RecoveryManager::InsertRedoRecordToInsertTranslator(transaction::Transactio
     common::ManagedPointer<parser::AbstractExpression> expression = col.StoredExpressionNotConst();
     col_types[col.Oid()] = expression->GetReturnValueType();
     cols[col.Oid()] = col;
-    STORAGE_LOG_ERROR("Col Oid: {}", col.Oid());
+    plan_builder.AddParameterInfo(col.Oid());
   }
 
-  std::vector<common::ManagedPointer<parser::AbstractExpression>> values;
+  std::vector<common::ManagedPointer<parser::AbstractExpression>> values(redo_record->Delta()->NumColumns());
   ExpressionMaker expr_maker;
   for (uint16_t i = 0; i < redo_record->Delta()->NumColumns(); i++) {
     col_id_t col_id = redo_record->Delta()->ColumnIds()[i];
     // We should ingore the version pointer column, this is a hidden storage layer column
     if (col_id != VERSION_POINTER_COLUMN_ID) {
       catalog::col_oid_t col_oid = sql_table->OidForColId(col_id);
-      plan_builder.AddParameterInfo(col_oid);
       type::TypeId value_type = col_types[col_oid];
       const auto type_id = execution::sql::GetTypeId(value_type);
       byte *raw_bytes = redo_record->Delta()->AccessWithNullCheck(i);
@@ -1168,52 +1167,59 @@ void RecoveryManager::InsertRedoRecordToInsertTranslator(transaction::Transactio
             STORAGE_LOG_ERROR("Col: {}, Boolean: {}", col_oid, *(reinterpret_cast<bool *>(raw_bytes)));
             break;
           case execution::sql::TypeId::TinyInt:
-            expr = expr_maker.Constant(*(reinterpret_cast<int64_t *>(reinterpret_cast<int8_t *>(raw_bytes))));
-            STORAGE_LOG_ERROR("Col: {}, TinyInt", col_oid);
+            expr = expr_maker.Constant(type::TypeId::TINYINT, *(reinterpret_cast<int64_t *>(reinterpret_cast<int8_t *>(raw_bytes))));
+            STORAGE_LOG_ERROR("Col: {}, TinyInt: {}", col_oid, *(reinterpret_cast<int8_t *>(raw_bytes)));
             break;
           case execution::sql::TypeId::SmallInt:
-            expr = expr_maker.Constant(*(reinterpret_cast<int64_t *>(reinterpret_cast<int16_t *>(raw_bytes))));
+            expr = expr_maker.Constant(type::TypeId::SMALLINT, *(reinterpret_cast<int64_t *>(reinterpret_cast<int16_t *>(raw_bytes))));
             STORAGE_LOG_ERROR("Col: {}, SmallInt: {}", col_oid, *(reinterpret_cast<int16_t *>(raw_bytes)));
             break;
           case execution::sql::TypeId::Integer:
-            expr = expr_maker.Constant(*(reinterpret_cast<int64_t *>(reinterpret_cast<int32_t *>(raw_bytes))));
+            expr = expr_maker.Constant(type::TypeId::INTEGER, *(reinterpret_cast<int64_t *>(reinterpret_cast<int32_t *>(raw_bytes))));
             STORAGE_LOG_ERROR("Col: {}, Integer: {}", col_oid, *(reinterpret_cast<int32_t *>(raw_bytes)));
             break;
           case execution::sql::TypeId::BigInt:
-            expr = expr_maker.Constant(*(reinterpret_cast<int64_t *>(raw_bytes)));
+            expr = expr_maker.Constant(type::TypeId::BIGINT, *(reinterpret_cast<int64_t *>(raw_bytes)));
             STORAGE_LOG_ERROR("Col: {}, BigInt", col_oid);
-            break;
-          case execution::sql::TypeId::Float:
-            expr = expr_maker.Constant(*(reinterpret_cast<float *>(raw_bytes)));
-            STORAGE_LOG_ERROR("Col: {}, Float", col_oid);
             break;
           case execution::sql::TypeId::Double:
             expr = expr_maker.Constant(*(reinterpret_cast<double *>(raw_bytes)));
-            STORAGE_LOG_ERROR("Col: {}, Double: {}", col_oid, *(reinterpret_cast<double *>(raw_bytes)));
+            STORAGE_LOG_ERROR("[Recovery] Col: {}, Double: {}", col_oid, *(reinterpret_cast<double *>(raw_bytes)));
             break;
-          case execution::sql::TypeId::Date:
-          case execution::sql::TypeId::Timestamp:
-          case execution::sql::TypeId::Varchar:
-            expr = expr_maker.Constant(*(reinterpret_cast<std::string *>(raw_bytes)));
-            STORAGE_LOG_ERROR("Date/TS/Varchar");
+          case execution::sql::TypeId::Date: {
+            auto date = execution::sql::Date::FromNative(*(reinterpret_cast<int32_t *>(raw_bytes)));
+            expr = expr_maker.Constant(date);
+            STORAGE_LOG_ERROR("Col: {}, Date: {}", col_oid, date.ToString());
             break;
+          }
+          case execution::sql::TypeId::Timestamp: {
+            auto ts = execution::sql::Timestamp::FromNative(*(reinterpret_cast<uint64_t *>(raw_bytes)));
+            expr = expr_maker.Constant(ts);
+            STORAGE_LOG_ERROR("TS");
+            break;
+          }
+          case execution::sql::TypeId::Varchar: {
+            const auto *entry = reinterpret_cast<const VarlenEntry *>(raw_bytes);
+            std::ostringstream os;
+            for (uint8_t pos = 0; pos < entry->Size(); pos++) {
+              os << std::setfill('0') << std::setw(2) << std::hex << static_cast<uint8_t>(entry->Content()[pos]);
+            }
+            STORAGE_LOG_ERROR("[Recovery] Size: {}, Str: {}", entry->Size(), os.str());
+            expr = expr_maker.Constant(*entry);
+            break;
+          }
           default:
             STORAGE_LOG_ERROR("WTF");
             throw NOT_IMPLEMENTED_EXCEPTION(fmt::format("Translation of constant type {}", TypeIdToString(type_id)));
         }
       }
-      values.emplace_back(expr);
+      values[static_cast<uint32_t>(col_oid)-1] = expr;
     }
   }
   plan_builder.AddValues(std::move(values));
 
-  // Q3. Set Index. Again, need to convert index::Index -> index_oid_t.
-  // Find what table we are insert into, get the index on the table using the catalog.
-  // Stores index objects and schemas
+  // Stores index objects.
   std::vector<catalog::index_oid_t> index_oids = accessor->GetIndexOids(redo_record->GetTableOid());
-
-  // If there's no indexes on the table, we can return
-  // if (index_oids.empty()) return;
   plan_builder.SetIndexOids(std::move(index_oids));
 
   // Q4. Insert type. How do I retrieve them? Could be values/select.
@@ -1223,7 +1229,6 @@ void RecoveryManager::InsertRedoRecordToInsertTranslator(transaction::Transactio
   std::unique_ptr<planner::InsertPlanNode> out_plan = plan_builder.Build();
 
   // Compile the plannode.
-  STORAGE_LOG_ERROR("Compile: {}", out_plan->GetInsertType());
   auto exec_query = execution::compiler::CompilationContext::Compile(*out_plan, exec_settings, accessor.get(),
                                                                      execution::compiler::CompilationMode::OneShot);
 
@@ -1231,7 +1236,6 @@ void RecoveryManager::InsertRedoRecordToInsertTranslator(transaction::Transactio
   auto exec_ctx = std::make_unique<execution::exec::ExecutionContext>(
       redo_record->GetDatabaseOid(), common::ManagedPointer<transaction::TransactionContext>(txn), callback,
                                         out_plan->GetOutputSchema().Get(), common::ManagedPointer<catalog::CatalogAccessor>(accessor), exec_settings, DISABLED, DISABLED, DISABLED);
-  STORAGE_LOG_ERROR("Run: ");
   exec_query->Run(common::ManagedPointer(exec_ctx), execution::vm::ExecutionMode::Interpret);
 
   auto new_tuple_slot = exec_ctx->GetTupleSlot();

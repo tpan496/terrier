@@ -9,6 +9,8 @@
 #include "spdlog/fmt/fmt.h"
 #include "storage/index/index_defs.h"
 
+#include "loggers/execution_logger.h"
+
 namespace noisepage::execution::compiler {
 
 //===----------------------------------------------------------------------===//

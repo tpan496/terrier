@@ -392,10 +392,12 @@ class StorageTestUtil {
     for (auto &tuple : table_one_tuples) {
       NOISEPAGE_ASSERT(tuple_slot_map.find(tuple) != tuple_slot_map.end(), "No mapping for this tuple slot");
       table_one->Select(common::ManagedPointer(txn_one), tuple, row_one);
+      STORAGE_LOG_ERROR(fmt::format("Original Row: {}", PrintRow(row_one, layout)));
       table_two->Select(common::ManagedPointer(txn_two), tuple_slot_map.at(tuple), row_two);
+      STORAGE_LOG_ERROR(fmt::format("Recovered Row: {}", PrintRow(row_two, layout)));
       if (!ProjectionListEqualDeep(layout, row_one, row_two)) {
         result = false;
-        break;
+        //break;
       }
     }
 
@@ -409,10 +411,10 @@ class StorageTestUtil {
   template <class RowType>
   static std::string PrintRow(const RowType &row, const storage::BlockLayout &layout) {
     std::ostringstream os;
-    os << "num_cols: " << row.NumColumns() << std::endl;
-    for (uint16_t i = 0; i < row.NumColumns(); i++) {
-      storage::col_id_t col_id = row.ColumnIds()[i];
-      const byte *attr = row.AccessWithNullCheck(i);
+    os << "num_cols: " << row->NumColumns() << std::endl;
+    for (uint16_t i = 0; i < row->NumColumns(); i++) {
+      storage::col_id_t col_id = row->ColumnIds()[i];
+      const byte *attr = row->AccessWithNullCheck(i);
       if (attr == nullptr) {
         os << "col_id: " << col_id.UnderlyingValue() << " is NULL" << std::endl;
         continue;
@@ -432,9 +434,14 @@ class StorageTestUtil {
       } else {
         os << "col_id: " << col_id.UnderlyingValue();
         os << " is ";
+
+        double d;
+        memcpy(&d, attr, sizeof(double));
+        os << d;
+        /**
         for (uint8_t pos = 0; pos < layout.AttrSize(col_id); pos++) {
           os << std::setfill('0') << std::setw(2) << std::hex << static_cast<uint8_t>(attr[pos]);
-        }
+        }**/
         os << std::endl;
       }
     }
@@ -582,8 +589,7 @@ class StorageTestUtil {
   template <typename Random>
   static catalog::Schema *RandomSchema(const uint16_t max_cols, Random *const generator, bool allow_varlen) {
     const uint16_t num_attrs = std::uniform_int_distribution<uint16_t>(1, max_cols)(*generator);
-    std::vector<type::TypeId> possible_attr_types{type::TypeId::BOOLEAN, type::TypeId::SMALLINT, type::TypeId::INTEGER,
-                                                  type::TypeId::REAL};
+    std::vector<type::TypeId> possible_attr_types{};
     if (allow_varlen) possible_attr_types.push_back(type::TypeId::VARCHAR);
 
     std::vector<catalog::Schema::Column> columns;
