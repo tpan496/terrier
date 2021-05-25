@@ -1040,11 +1040,7 @@ void VM::Interpret(const uint8_t *ip, Frame *frame) {  // NOLINT
     auto *string = module_->GetBytecodeModule()->AccessStaticLocalDataRaw(LocalVar::Decode(READ_STATIC_LOCAL_ID()));
     auto length = READ_UIMM4();
     OpInitString(sql_string, string, length);
-    std::ostringstream os;
-    for (uint8_t pos = 0; pos < length; pos++) {
-      os << std::setfill('0') << std::setw(2) << std::hex << string[pos];
-    }
-    EXECUTION_LOG_ERROR("[OpInitString] Size: {}, Str: {}", length, os.str());
+    EXECUTION_LOG_ERROR("[OpInitString] Size: {}, Str: {}", length, std::string(sql_string->StringView()));
     DISPATCH_NEXT();
   }
 

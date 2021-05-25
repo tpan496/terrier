@@ -12,6 +12,8 @@
 #include "parser/expression/abstract_expression.h"
 #include "type/type_util.h"
 
+#include "loggers/execution_logger.h"
+
 namespace noisepage::binder {
 class BindNodeVisitor;
 }

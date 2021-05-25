@@ -10,6 +10,8 @@
 #include "storage/index/index_defs.h"
 
 #include "loggers/execution_logger.h"
+#include "execution/ast/ast_pretty_print.h"
+#include <llvm/ADT/StringRef.h>
 
 namespace noisepage::execution::compiler {
 
@@ -100,7 +102,10 @@ ast::Expr *CodeGen::ConstDouble(double val) const {
 }
 
 ast::Expr *CodeGen::ConstString(std::string_view str) const {
-  ast::Expr *expr = context_->GetNodeFactory()->NewStringLiteral(position_, MakeIdentifier(str));
+  auto identifier =  MakeIdentifier(str);
+  ast::Expr *expr = context_->GetNodeFactory()->NewStringLiteral(position_, identifier);
+  EXECUTION_LOG_ERROR("Identifier: {}", identifier.GetString());
+  ast::AstPrettyPrint::Dump(std::cout, expr);
   expr->SetType(ast::StringType::Get(context_));
   return expr;
 }
@@ -1302,6 +1307,8 @@ ast::Identifier CodeGen::MakeFreshIdentifier(const std::string &str) {
 }
 
 ast::Identifier CodeGen::MakeIdentifier(std::string_view str) const {
+  llvm::StringRef ref = {str.data(), str.length()};
+  EXECUTION_LOG_ERROR("LLVM StringRef: {}", std::string(ref));
   return context_->GetIdentifier({str.data(), str.length()});
 }
 

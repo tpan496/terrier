@@ -176,7 +176,7 @@ uint32_t RecoveryManager::ProcessCommittedTransaction(noisepage::transaction::ti
       idx += ProcessSpecialCaseCatalogRecord(txn, &buffered_changes_map_[txn_id], idx);
     } else if (buffered_record->RecordType() == LogRecordType::REDO) {
       // STORAGE_LOG_ERROR("Process Committed Transaction");
-      ReplayRedoRecord(txn, buffered_record);
+      ReplayRedoRecord(txn, buffered_record, buffered_changes_map_[txn_id][idx].second);
     } else {
       ReplayDeleteRecord(txn, buffered_record);
     }
@@ -252,7 +252,7 @@ bool RecoveryManager::IsSpecialPGTables(catalog::table_oid_t table_oid) {
          table_oid == catalog::postgres::PgStatistic::STATISTIC_TABLE_OID;
 }
 
-void RecoveryManager::ReplayRedoRecord(transaction::TransactionContext *txn, LogRecord *record) {
+void RecoveryManager::ReplayRedoRecord(transaction::TransactionContext *txn, LogRecord *record, std::vector<byte *> varlen_contents) {
   auto *redo_record = record->GetUnderlyingRecordBodyAs<RedoRecord>();
   //STORAGE_LOG_ERROR(
   //    fmt::format("DatabaseOid: {}, TableOid: {}", redo_record->GetDatabaseOid(), redo_record->GetTableOid()));
@@ -263,7 +263,7 @@ void RecoveryManager::ReplayRedoRecord(transaction::TransactionContext *txn, Log
     if (IsSpecialPGTables(table_oid)) {
       //STORAGE_LOG_ERROR("PG Tables");
     } else {
-      InsertRedoRecordToInsertTranslator(txn, sql_table_ptr, redo_record);
+      InsertRedoRecordToInsertTranslator(txn, sql_table_ptr, redo_record, varlen_contents);
       return;
     }
 
@@ -697,7 +697,7 @@ uint32_t RecoveryManager::ProcessSpecialCasePGClassRecord(
     switch (updated_pg_class_oid.UnderlyingValue()) {
       case (catalog::postgres::PgClass::REL_NEXTCOLOID.oid_.UnderlyingValue()): {  // Case 1
         // STORAGE_LOG_ERROR("Process Special Case PG Class Record");
-        ReplayRedoRecord(txn, curr_record);
+        ReplayRedoRecord(txn, curr_record, {});
         return 0;  // No additional logs processed
       }
 
@@ -1121,7 +1121,7 @@ uint32_t RecoveryManager::ProcessSpecialCasePGProcRecord(
     auto *redo_record = curr_record->GetUnderlyingRecordBodyAs<RedoRecord>();
     if (IsInsertRecord(redo_record)) {
       // STORAGE_LOG_ERROR("Process Special Case PG Proc Record");
-      ReplayRedoRecord(txn, curr_record);
+      ReplayRedoRecord(txn, curr_record, {});
     } else {
       return 0;
     }
@@ -1162,7 +1162,8 @@ void InsertCallback (byte* tuples, uint32_t num_tuples, uint32_t tuple_size) {
 
 void RecoveryManager::InsertRedoRecordToInsertTranslator(transaction::TransactionContext *txn,
                                                          common::ManagedPointer<storage::SqlTable> sql_table,
-                                                         storage::RedoRecord *redo_record) {
+                                                         storage::RedoRecord *redo_record,
+                                                         std::vector<byte *> varlen_contents) {
   std::unique_ptr<catalog::CatalogAccessor> accessor =
       catalog_->GetAccessor(common::ManagedPointer(txn), redo_record->GetDatabaseOid(), DISABLED);
   
@@ -1241,13 +1242,13 @@ void RecoveryManager::InsertRedoRecordToInsertTranslator(transaction::Transactio
             break;
           }
           case execution::sql::TypeId::Varchar: {
-            const auto *entry = reinterpret_cast<const VarlenEntry *>(raw_bytes);
-            std::ostringstream os;
+            const auto *entry = reinterpret_cast<VarlenEntry *>(raw_bytes);
+            /*std::ostringstream os;
             for (uint8_t pos = 0; pos < entry->Size(); pos++) {
               os << std::setfill('0') << std::setw(2) << std::hex << static_cast<uint8_t>(entry->Content()[pos]);
-            }
-            STORAGE_LOG_ERROR("[Recovery] Size: {}, Str: {}", entry->Size(), os.str());
-            expr = expr_maker.Constant(*entry);
+            }*/
+            STORAGE_LOG_ERROR("[Recovery] Size: {}, Str: {}", entry->Size(), std::string(entry->StringView()));
+            expr = expr_maker.Constant(*entry, varlen_contents);
             break;
           }
           default:

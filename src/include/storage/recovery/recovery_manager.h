@@ -76,8 +76,6 @@ class ExpressionMaker {
         std::make_unique<parser::ConstantValueExpression>(integer_type, execution::sql::Integer(val)));
   }
 
-
-
   /**
    * Create a double constant expression
    */
@@ -89,9 +87,11 @@ class ExpressionMaker {
   /**
    * Create a string constant expression
    */
-  ManagedExpression Constant(const storage::VarlenEntry entry) {
-    auto string_val = execution::sql::ValueUtil::CreateStringVal(entry);
-    return MakeManaged(std::make_unique<parser::ConstantValueExpression>(type::TypeId::VARCHAR, string_val.first, std::move(string_val.second)));
+  ManagedExpression Constant(const storage::VarlenEntry entry, std::vector<byte *> varlen_contents) {
+    if (varlen_contents.size() <= 0) {
+      return MakeManaged(std::make_unique<parser::ConstantValueExpression>(type::TypeId::VARCHAR, execution::sql::StringVal(entry)));
+    }
+    return MakeManaged(std::make_unique<parser::ConstantValueExpression>(type::TypeId::VARCHAR, execution::sql::StringVal(entry), std::unique_ptr<byte[]>(varlen_contents[0])));
   }
 
   /**
@@ -454,7 +454,7 @@ class RecoveryManager : public common::DedicatedThreadOwner {
    * @param txn txn to use for replay
    * @param record record to replay
    */
-  void ReplayRedoRecord(transaction::TransactionContext *txn, LogRecord *record);
+  void ReplayRedoRecord(transaction::TransactionContext *txn, LogRecord *record, std::vector<byte *> varlen_contents);
 
   /**
    * Replays a delete record. Updates necessary metadata
@@ -498,6 +498,7 @@ class RecoveryManager : public common::DedicatedThreadOwner {
 
   void InsertRedoRecordToInsertTranslator(transaction::TransactionContext *txn,
                                           common::ManagedPointer<storage::SqlTable> sql_table,
-                                          storage::RedoRecord *redo_record);
+                                          storage::RedoRecord *redo_record,
+                                          std::vector<byte *> varlen_contents);
 };
 }  // namespace noisepage::storage
