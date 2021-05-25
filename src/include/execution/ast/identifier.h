@@ -21,7 +21,6 @@ class Identifier {
 
   // Constructor accessible only to Context which ensures uniqueness.
   explicit Identifier(const char *str) noexcept : data_(str) {}
-
  public:
   /**
    * Create an empty identifier.

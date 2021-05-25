@@ -205,6 +205,7 @@ Identifier Context::GetIdentifier(llvm::StringRef str) {
   }
 
   auto iter = Impl()->string_table_.insert(std::make_pair(str, static_cast<char>(0))).first;
+  EXECUTION_LOG_ERROR("GetIdentifier: {}, Raw: {}", std::string(iter->getKeyData()), std::string(str));
   return Identifier(iter->getKeyData());
 }
 
