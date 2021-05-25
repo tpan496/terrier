@@ -2115,6 +2115,7 @@ void VM::Interpret(const uint8_t *ip, Frame *frame) {  // NOLINT
     auto *tuple_slot = frame->LocalAt<storage::TupleSlot *>(READ_LOCAL_ID());
 
     OpStorageInterfaceTableDelete(result, storage_interface, tuple_slot);
+    storage_interface->GetExecutionContext()->SetTupleSlot(*tuple_slot);
     DISPATCH_NEXT();
   }
 

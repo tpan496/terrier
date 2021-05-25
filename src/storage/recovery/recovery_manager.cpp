@@ -33,6 +33,7 @@
 #include "execution/exec/execution_settings.h"
 #include "planner/plannodes/output_schema.h"
 #include "planner/plannodes/insert_plan_node.h"
+#include "planner/plannodes/delete_plan_node.h"
 #include "execution/compiler/expression/expression_translator.h"
 #include "execution/exec/execution_context.h"
 
@@ -304,7 +305,8 @@ void RecoveryManager::ReplayDeleteRecord(transaction::TransactionContext *txn, L
   auto db_catalog_ptr = GetDatabaseCatalog(txn, delete_record->GetDatabaseOid());
   auto sql_table_ptr = db_catalog_ptr->GetTable(common::ManagedPointer(txn), delete_record->GetTableOid());
   const auto &schema = GetTableSchema(txn, db_catalog_ptr, delete_record->GetTableOid());
-
+  DeleteRecordToDeleteTranslator(txn, sql_table_ptr, delete_record);
+  return;
   // Stage the delete. This way the recovery operation is logged if logging is enabled
   txn->StageDelete(delete_record->GetDatabaseOid(), delete_record->GetTableOid(), new_tuple_slot);
 
@@ -1284,6 +1286,43 @@ void RecoveryManager::InsertRedoRecordToInsertTranslator(transaction::Transactio
   auto new_tuple_slot = exec_ctx->GetTupleSlot();
   auto old_tuple_slot = redo_record->GetTupleSlot();
   tuple_slot_map_[old_tuple_slot] = new_tuple_slot;
+}
+
+void RecoveryManager::DeleteRecordToDeleteTranslator(transaction::TransactionContext *txn,
+                                                         common::ManagedPointer<storage::SqlTable> sql_table,
+                                                         storage::DeleteRecord *delete_record) {
+  std::unique_ptr<catalog::CatalogAccessor> accessor =
+      catalog_->GetAccessor(common::ManagedPointer(txn), delete_record->GetDatabaseOid(), DISABLED);
+  
+  execution::exec::ExecutionSettings exec_settings{};
+  exec_settings.UpdateFromSettingsManager(settings_manager_);
+
+  // Convert the redo record into a plannode.
+  planner::DeletePlanNode::Builder plan_builder;
+  plan_builder.SetDatabaseOid(delete_record->GetDatabaseOid());
+  plan_builder.SetTableOid(delete_record->GetTableOid());
+
+  // Stores index objects.
+  std::vector<catalog::index_oid_t> index_oids = accessor->GetIndexOids(delete_record->GetTableOid());
+  plan_builder.SetIndexOids(std::move(index_oids));
+
+  // Q4. Insert type. How do I retrieve them? Could be values/select.
+  plan_builder.SetOutputSchema(std::make_unique<planner::OutputSchema>());
+  
+  std::unique_ptr<planner::DeletePlanNode> out_plan = plan_builder.Build();
+
+  // Compile the plannode.
+  auto exec_query = execution::compiler::CompilationContext::Compile(*out_plan, exec_settings, accessor.get(),
+                                                                     execution::compiler::CompilationMode::OneShot);
+
+  execution::exec::OutputCallback callback = InsertCallback;
+  auto exec_ctx = std::make_unique<execution::exec::ExecutionContext>(
+      delete_record->GetDatabaseOid(), common::ManagedPointer<transaction::TransactionContext>(txn), callback,
+                                        out_plan->GetOutputSchema().Get(), common::ManagedPointer<catalog::CatalogAccessor>(accessor), exec_settings, DISABLED, DISABLED, DISABLED);
+  exec_query->Run(common::ManagedPointer(exec_ctx), execution::vm::ExecutionMode::Interpret);
+
+  auto new_tuple_slot = exec_ctx->GetTupleSlot();
+  tuple_slot_map_.erase(new_tuple_slot);
 }
 
 }  // namespace noisepage::storage

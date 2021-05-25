@@ -500,5 +500,9 @@ class RecoveryManager : public common::DedicatedThreadOwner {
                                           common::ManagedPointer<storage::SqlTable> sql_table,
                                           storage::RedoRecord *redo_record,
                                           std::vector<byte *> varlen_contents);
+
+  void DeleteRecordToDeleteTranslator(transaction::TransactionContext *txn,
+                                          common::ManagedPointer<storage::SqlTable> sql_table,
+                                          storage::DeleteRecord *delete_record);
 };
 }  // namespace noisepage::storage
