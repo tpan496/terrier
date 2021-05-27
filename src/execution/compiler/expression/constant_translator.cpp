@@ -38,7 +38,6 @@ ast::Expr *ConstantTranslator::DeriveValue(WorkContext *ctx, const ColumnValuePr
     case sql::TypeId::Timestamp:
       return codegen->TimestampToSql(val.GetTimestampVal().val_);
     case sql::TypeId::Varchar:
-      EXECUTION_LOG_ERROR("GetStringVal: {}", std::string(val.GetStringVal().StringView()));
       return codegen->StringToSql(val.GetStringVal().StringView());
     default:
       throw NOT_IMPLEMENTED_EXCEPTION(fmt::format("Translation of constant type {}", TypeIdToString(type_id)));

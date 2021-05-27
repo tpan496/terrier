@@ -264,8 +264,8 @@ void RecoveryManager::ReplayRedoRecord(transaction::TransactionContext *txn, Log
     if (IsSpecialPGTables(table_oid)) {
       //STORAGE_LOG_ERROR("PG Tables");
     } else {
-      InsertRedoRecordToInsertTranslator(txn, sql_table_ptr, redo_record, varlen_contents);
-      return;
+      //InsertRedoRecordToInsertTranslator(txn, sql_table_ptr, redo_record, varlen_contents);
+      //return;
     }
 
     // Save the old tuple slot, and reset the tuple slot in the record
@@ -305,8 +305,8 @@ void RecoveryManager::ReplayDeleteRecord(transaction::TransactionContext *txn, L
   auto db_catalog_ptr = GetDatabaseCatalog(txn, delete_record->GetDatabaseOid());
   auto sql_table_ptr = db_catalog_ptr->GetTable(common::ManagedPointer(txn), delete_record->GetTableOid());
   const auto &schema = GetTableSchema(txn, db_catalog_ptr, delete_record->GetTableOid());
-  DeleteRecordToDeleteTranslator(txn, sql_table_ptr, delete_record);
-  return;
+  //DeleteRecordToDeleteTranslator(txn, sql_table_ptr, delete_record);
+  //return;
   // Stage the delete. This way the recovery operation is logged if logging is enabled
   txn->StageDelete(delete_record->GetDatabaseOid(), delete_record->GetTableOid(), new_tuple_slot);
 
@@ -910,6 +910,7 @@ uint32_t RecoveryManager::ProcessSpecialCasePGClassRecord(
           tuple_slot_map_[next_redo_record->GetTupleSlot()] = tuple_slot_result[0];
           delete[] buffer;
           tuple_slot_map_.erase(delete_record->GetTupleSlot());
+
           delete[] reinterpret_cast<byte *>(next_redo_record);
 
           return 1;  // We processed an additional record
@@ -1204,53 +1205,52 @@ void RecoveryManager::InsertRedoRecordToInsertTranslator(transaction::Transactio
       auto col = cols[col_oid];
       if (raw_bytes == nullptr) {
         expr = expr_maker.Constant();
-        STORAGE_LOG_ERROR("NULL");
+        //STORAGE_LOG_ERROR("NULL");
       } else {
         switch (type_id) {
           case execution::sql::TypeId::Boolean:
             expr = expr_maker.Constant(*(reinterpret_cast<bool *>(raw_bytes)));
-            STORAGE_LOG_ERROR("Col: {}, Boolean: {}", col_oid, *(reinterpret_cast<bool *>(raw_bytes)));
+            //STORAGE_LOG_ERROR("Col: {}, Boolean: {}", col_oid, *(reinterpret_cast<bool *>(raw_bytes)));
             break;
           case execution::sql::TypeId::TinyInt:
             expr = expr_maker.Constant(type::TypeId::TINYINT, *(reinterpret_cast<int64_t *>(reinterpret_cast<int8_t *>(raw_bytes))));
-            STORAGE_LOG_ERROR("Col: {}, TinyInt: {}", col_oid, *(reinterpret_cast<int8_t *>(raw_bytes)));
+            //STORAGE_LOG_ERROR("Col: {}, TinyInt: {}", col_oid, *(reinterpret_cast<int8_t *>(raw_bytes)));
             break;
           case execution::sql::TypeId::SmallInt:
             expr = expr_maker.Constant(type::TypeId::SMALLINT, *(reinterpret_cast<int64_t *>(reinterpret_cast<int16_t *>(raw_bytes))));
-            STORAGE_LOG_ERROR("Col: {}, SmallInt: {}", col_oid, *(reinterpret_cast<int16_t *>(raw_bytes)));
+            //STORAGE_LOG_ERROR("Col: {}, SmallInt: {}", col_oid, *(reinterpret_cast<int16_t *>(raw_bytes)));
             break;
           case execution::sql::TypeId::Integer:
             expr = expr_maker.Constant(type::TypeId::INTEGER, *(reinterpret_cast<int64_t *>(reinterpret_cast<int32_t *>(raw_bytes))));
-            STORAGE_LOG_ERROR("Col: {}, Integer: {}", col_oid, *(reinterpret_cast<int32_t *>(raw_bytes)));
+            //STORAGE_LOG_ERROR("Col: {}, Integer: {}", col_oid, *(reinterpret_cast<int32_t *>(raw_bytes)));
             break;
           case execution::sql::TypeId::BigInt:
             expr = expr_maker.Constant(type::TypeId::BIGINT, *(reinterpret_cast<int64_t *>(raw_bytes)));
-            STORAGE_LOG_ERROR("Col: {}, BigInt", col_oid);
+            //STORAGE_LOG_ERROR("Col: {}, BigInt", col_oid);
             break;
           case execution::sql::TypeId::Double:
             expr = expr_maker.Constant(*(reinterpret_cast<double *>(raw_bytes)));
-            STORAGE_LOG_ERROR("[Recovery] Col: {}, Double: {}", col_oid, *(reinterpret_cast<double *>(raw_bytes)));
+            //STORAGE_LOG_ERROR("[Recovery] Col: {}, Double: {}", col_oid, *(reinterpret_cast<double *>(raw_bytes)));
             break;
           case execution::sql::TypeId::Date: {
             auto date = execution::sql::Date::FromNative(*(reinterpret_cast<int32_t *>(raw_bytes)));
             expr = expr_maker.Constant(date);
-            STORAGE_LOG_ERROR("Col: {}, Date: {}", col_oid, date.ToString());
+            //STORAGE_LOG_ERROR("Col: {}, Date: {}", col_oid, date.ToString());
             break;
           }
           case execution::sql::TypeId::Timestamp: {
             auto ts = execution::sql::Timestamp::FromNative(*(reinterpret_cast<uint64_t *>(raw_bytes)));
             expr = expr_maker.Constant(ts);
-            STORAGE_LOG_ERROR("TS");
+            //STORAGE_LOG_ERROR("TS");
             break;
           }
           case execution::sql::TypeId::Varchar: {
             const auto *entry = reinterpret_cast<VarlenEntry *>(raw_bytes);
-            STORAGE_LOG_ERROR("[Recovery] Size: {}, Str: {}, End: {}", entry->Size(), std::string(entry->StringView()), std::string(entry->StringView()).find('\0'));
+            //STORAGE_LOG_ERROR("[Recovery] Size: {}, Str: {}, End: {}", entry->Size(), std::string(entry->StringView()), std::string(entry->StringView()).find('\0'));
             expr = expr_maker.Constant(std::string(entry->StringView()));
             break;
           }
           default:
-            STORAGE_LOG_ERROR("WTF");
             throw NOT_IMPLEMENTED_EXCEPTION(fmt::format("Translation of constant type {}", TypeIdToString(type_id)));
         }
       }

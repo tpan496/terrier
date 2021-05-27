@@ -249,11 +249,11 @@ TEST_F(RecoveryTests, SingleTableInsertTest) {
       .SetInitialTableSize(100)
       .SetTxnLength(5)
       .SetInsertUpdateSelectDeleteRatio({1.0, 0.0, 0.0, 0.0})
-      .SetVarlenAllowed(true)
+      .SetVarlenAllowed(false)
       .Build();
   RecoveryTests::RunTest(config);
 }
-/**
+
 // This test inserts some tuples into a single table. It then recreates the test table from
 // the log, and verifies that this new table is the same as the original table
 // NOLINTNEXTLINE
@@ -789,6 +789,6 @@ TEST_F(RecoveryTests, DoubleRecoveryTest) {
 
   secondary_recovery_db_main->GetTransactionLayer()->GetDeferredActionManager()->RegisterDeferredAction(
       [=]() { unlink(secondary_log_file.c_str()); });
-}**/
+}
 
 }  // namespace noisepage::storage

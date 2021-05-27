@@ -221,7 +221,6 @@ void LargeSqlTableTestObject::PopulateInitialTables(uint16_t num_databases, uint
         catalog_->CreateDatabase(common::ManagedPointer(initial_txn_), "database" + std::to_string(db_idx), true);
     NOISEPAGE_ASSERT(database_oid != catalog::INVALID_DATABASE_OID, "Database creation should always succeed");
     database_oids_.emplace_back(database_oid);
-    STORAGE_LOG_ERROR(fmt::format("Create Database: {}", database_oid));
 
     // Create test namespace
     auto db_catalog_ptr = catalog_->GetDatabaseCatalog(common::ManagedPointer(initial_txn_), database_oid);
@@ -233,7 +232,6 @@ void LargeSqlTableTestObject::PopulateInitialTables(uint16_t num_databases, uint
                                     : StorageTestUtil::RandomSchemaNoVarlen(max_columns, generator);
       auto table_oid = db_catalog_ptr->CreateTable(common::ManagedPointer(initial_txn_), namespace_oid,
                                                    "table" + std::to_string(table_idx), *schema);
-      STORAGE_LOG_ERROR(fmt::format("Create Table: {}", table_oid));
       NOISEPAGE_ASSERT(table_oid != catalog::INVALID_TABLE_OID, "Table creation should always succeed");
       delete schema;
       table_oids_[database_oid].emplace_back(table_oid);

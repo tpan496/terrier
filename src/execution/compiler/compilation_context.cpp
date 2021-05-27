@@ -320,7 +320,6 @@ void CompilationContext::Prepare(const planner::AbstractPlanNode &plan, Pipeline
 
 void CompilationContext::Prepare(const parser::AbstractExpression &expression) {
   std::unique_ptr<ExpressionTranslator> translator;
-  //EXECUTION_LOG_ERROR("Prepare Type: {}", expression.GetExpressionType());
 
   switch (expression.GetExpressionType()) {
     case parser::ExpressionType::COLUMN_VALUE: {

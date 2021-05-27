@@ -542,8 +542,6 @@ void BytecodeGenerator::VisitSqlConversionCall(ast::CallExpr *call, ast::Builtin
     }
     case ast::Builtin::FloatToSql: {
       auto input = VisitExpressionForRValue(call->Arguments()[0]);
-      EXECUTION_LOG_ERROR("[BytecodeGenerator] FloatToSql");
-      ast::AstPrettyPrint::Dump(std::cout, call->Arguments()[0]);
       GetEmitter()->Emit(Bytecode::InitReal, dest, input);
       break;
     }

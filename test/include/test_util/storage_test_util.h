@@ -110,7 +110,7 @@ class StorageTestUtil {
   // given generator as a source of randomness.
   template <typename Random>
   static void FillWithRandomBytes(const uint32_t num_bytes, byte *const out, Random *const generator) {
-    std::uniform_int_distribution<uint8_t> dist(0, UINT8_MAX);
+    std::uniform_int_distribution<uint8_t> dist(1, UINT8_MAX);
     for (uint32_t i = 0; i < num_bytes; i++) {
       if (dist(*generator) == '\0') {
         out[i] = static_cast<byte>('1');
@@ -398,9 +398,9 @@ class StorageTestUtil {
     for (auto &tuple : table_one_tuples) {
       NOISEPAGE_ASSERT(tuple_slot_map.find(tuple) != tuple_slot_map.end(), "No mapping for this tuple slot");
       table_one->Select(common::ManagedPointer(txn_one), tuple, row_one);
-      STORAGE_LOG_ERROR(fmt::format("Original Row: {}", PrintRow(row_one, layout)));
+      //STORAGE_LOG_ERROR(fmt::format("Original Row: {}", PrintRow(row_one, layout)));
       table_two->Select(common::ManagedPointer(txn_two), tuple_slot_map.at(tuple), row_two);
-      STORAGE_LOG_ERROR(fmt::format("Recovered Row: {}", PrintRow(row_two, layout)));
+      //STORAGE_LOG_ERROR(fmt::format("Recovered Row: {}", PrintRow(row_two, layout)));
       if (!ProjectionListEqualDeep(layout, row_one, row_two)) {
         result = false;
         break;
@@ -595,16 +595,14 @@ class StorageTestUtil {
   template <typename Random>
   static catalog::Schema *RandomSchema(const uint16_t max_cols, Random *const generator, bool allow_varlen) {
     const uint16_t num_attrs = std::uniform_int_distribution<uint16_t>(1, max_cols)(*generator);
-    std::vector<type::TypeId> possible_attr_types{};
+    std::vector<type::TypeId> possible_attr_types{type::TypeId::REAL};
     if (allow_varlen) possible_attr_types.push_back(type::TypeId::VARCHAR);
 
     std::vector<catalog::Schema::Column> columns;
     columns.reserve(num_attrs);
 
-      STORAGE_LOG_ERROR(fmt::format("Num attrs: {}", num_attrs));
     for (uint16_t i = 0; i < num_attrs; i++) {
       auto random_type = *RandomTestUtil::UniformRandomElement(&possible_attr_types, generator);
-      STORAGE_LOG_ERROR(fmt::format("Type: {}", random_type));
 
       catalog::Schema::Column col;
       if (random_type == type::TypeId::VARCHAR) {

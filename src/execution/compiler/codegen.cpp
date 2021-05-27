@@ -104,14 +104,11 @@ ast::Expr *CodeGen::ConstDouble(double val) const {
 ast::Expr *CodeGen::ConstString(std::string_view str) const {
   auto identifier =  MakeIdentifier(str);
   ast::Expr *expr = context_->GetNodeFactory()->NewStringLiteral(position_, identifier);
-  EXECUTION_LOG_ERROR("Identifier: {}", identifier.GetString());
-  ast::AstPrettyPrint::Dump(std::cout, expr);
   expr->SetType(ast::StringType::Get(context_));
   return expr;
 }
 
 ast::Expr *CodeGen::ConstNull(type::TypeId type) const {
-  //EXECUTION_LOG_ERROR(fmt::format("ConstNull: {}", type));
   ast::Expr *dummy_expr;
   // initSqlNull(&expr) produces a NULL of expr's type.
   switch (type) {
@@ -1307,8 +1304,6 @@ ast::Identifier CodeGen::MakeFreshIdentifier(const std::string &str) {
 }
 
 ast::Identifier CodeGen::MakeIdentifier(std::string_view str) const {
-  //llvm::StringRef ref = {str.data(), str.length()};
-  //EXECUTION_LOG_ERROR("LLVM StringRef: {}", std::string(ref));
   return context_->GetStringIdentifier({str.data(), str.length()});
 }
 
