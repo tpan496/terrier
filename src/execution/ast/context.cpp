@@ -215,7 +215,7 @@ Identifier Context::GetStringIdentifier(llvm::StringRef str) {
   }
 
   auto iter = Impl()->string_table_.insert(std::make_pair(str, static_cast<char>(0))).first;
-  //EXECUTION_LOG_ERROR("GetIdentifier: {}, Raw: {}", std::string(iter->getKeyData()), str.str());
+  EXECUTION_LOG_ERROR("GetIdentifier: {}, Raw: {}, Size: {}", iter->getKey().data(), str.data(), str.size());
   return Identifier(iter->getKeyData());
 }
 

@@ -111,7 +111,13 @@ class StorageTestUtil {
   template <typename Random>
   static void FillWithRandomBytes(const uint32_t num_bytes, byte *const out, Random *const generator) {
     std::uniform_int_distribution<uint8_t> dist(0, UINT8_MAX);
-    for (uint32_t i = 0; i < num_bytes; i++) out[i] = static_cast<byte>(dist(*generator));
+    for (uint32_t i = 0; i < num_bytes; i++) {
+      if (dist(*generator) == '\0') {
+        out[i] = static_cast<byte>('1');
+      } else {
+        out[i] = static_cast<byte>(dist(*generator));
+      }
+    }
   }
 
   template <typename Random>
