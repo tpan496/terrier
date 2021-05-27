@@ -87,11 +87,10 @@ class ExpressionMaker {
   /**
    * Create a string constant expression
    */
-  ManagedExpression Constant(const storage::VarlenEntry entry, std::vector<byte *> varlen_contents) {
-    if (varlen_contents.size() <= 0) {
-      return MakeManaged(std::make_unique<parser::ConstantValueExpression>(type::TypeId::VARCHAR, execution::sql::StringVal(entry)));
-    }
-    return MakeManaged(std::make_unique<parser::ConstantValueExpression>(type::TypeId::VARCHAR, execution::sql::StringVal(entry), std::unique_ptr<byte[]>(varlen_contents[0])));
+  ManagedExpression Constant(const std::string &str) {
+    auto string_val = execution::sql::ValueUtil::CreateStringVal(str);
+    return MakeManaged(std::make_unique<parser::ConstantValueExpression>(type::TypeId::VARCHAR, string_val.first,
+                                                                         std::move(string_val.second)));
   }
 
   /**

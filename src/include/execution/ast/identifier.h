@@ -16,7 +16,7 @@ namespace noisepage::execution::ast {
  * pointer value - we don't need to check contents.
  */
 class Identifier {
- private:
+ public:
   friend class Context;
 
   // Constructor accessible only to Context which ensures uniqueness.

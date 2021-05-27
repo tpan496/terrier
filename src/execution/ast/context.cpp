@@ -205,7 +205,17 @@ Identifier Context::GetIdentifier(llvm::StringRef str) {
   }
 
   auto iter = Impl()->string_table_.insert(std::make_pair(str, static_cast<char>(0))).first;
-  EXECUTION_LOG_ERROR("GetIdentifier: {}, Raw: {}", std::string(iter->getKeyData()), str.str());
+  return Identifier(iter->getKeyData());
+}
+
+Identifier Context::GetStringIdentifier(llvm::StringRef str) {
+  if (str.empty()) {
+    auto iter = Impl()->string_table_.insert(std::make_pair("", static_cast<char>(0))).first;
+    return Identifier(iter->getKeyData());
+  }
+
+  auto iter = Impl()->string_table_.insert(std::make_pair(str, static_cast<char>(0))).first;
+  //EXECUTION_LOG_ERROR("GetIdentifier: {}, Raw: {}", std::string(iter->getKeyData()), str.str());
   return Identifier(iter->getKeyData());
 }
 

@@ -397,7 +397,7 @@ class StorageTestUtil {
       STORAGE_LOG_ERROR(fmt::format("Recovered Row: {}", PrintRow(row_two, layout)));
       if (!ProjectionListEqualDeep(layout, row_one, row_two)) {
         result = false;
-        //break;
+        break;
       }
     }
 

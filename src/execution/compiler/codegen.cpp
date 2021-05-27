@@ -1307,9 +1307,9 @@ ast::Identifier CodeGen::MakeFreshIdentifier(const std::string &str) {
 }
 
 ast::Identifier CodeGen::MakeIdentifier(std::string_view str) const {
-  llvm::StringRef ref = {str.data(), str.length()};
-  EXECUTION_LOG_ERROR("LLVM StringRef: {}", std::string(ref));
-  return context_->GetIdentifier({str.data(), str.length()});
+  //llvm::StringRef ref = {str.data(), str.length()};
+  //EXECUTION_LOG_ERROR("LLVM StringRef: {}", std::string(ref));
+  return context_->GetStringIdentifier({str.data(), str.length()});
 }
 
 ast::IdentifierExpr *CodeGen::MakeExpr(ast::Identifier ident) const {

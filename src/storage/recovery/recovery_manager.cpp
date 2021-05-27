@@ -1245,12 +1245,8 @@ void RecoveryManager::InsertRedoRecordToInsertTranslator(transaction::Transactio
           }
           case execution::sql::TypeId::Varchar: {
             const auto *entry = reinterpret_cast<VarlenEntry *>(raw_bytes);
-            /*std::ostringstream os;
-            for (uint8_t pos = 0; pos < entry->Size(); pos++) {
-              os << std::setfill('0') << std::setw(2) << std::hex << static_cast<uint8_t>(entry->Content()[pos]);
-            }*/
-            STORAGE_LOG_ERROR("[Recovery] Size: {}, Str: {}", entry->Size(), std::string(entry->StringView()));
-            expr = expr_maker.Constant(*entry, varlen_contents);
+            STORAGE_LOG_ERROR("[Recovery] Size: {}, Str: {}, End: {}", entry->Size(), std::string(entry->StringView()), std::string(entry->StringView()).find('\0'));
+            expr = expr_maker.Constant(std::string(entry->StringView()));
             break;
           }
           default:

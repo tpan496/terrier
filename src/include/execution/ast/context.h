@@ -58,6 +58,8 @@ class Context {
    */
   Identifier GetIdentifier(llvm::StringRef str);
 
+  Identifier GetStringIdentifier(llvm::StringRef str);
+
   /**
    * Lookup a builtin type with name @em name in the TPL type system.
    * @return A non-null pointer to the Type if @em name is a valid builtin type; null otherwise.
