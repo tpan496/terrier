@@ -8,12 +8,14 @@
 #include "parser/delete_statement.h"
 #include "planner/plannodes/abstract_plan_node.h"
 #include "planner/plannodes/plan_visitor.h"
+#include "planner/plannodes/delete_plan_node.h"
+#include "storage/storage_defs.h"
 
 namespace noisepage::planner {
 /**
  * The plan node for DELETE
  */
-class DeletePlanNode : public AbstractPlanNode {
+class TupleDeletePlanNode : public DeletePlanNode {
  public:
   /**
    * Builder for a delete plan node
@@ -55,10 +57,19 @@ class DeletePlanNode : public AbstractPlanNode {
     }
 
     /**
+     * @param tuple_slot of Delete Record
+     * @return builder object
+     */
+    Builder &SetTupleSlot(const storage::TupleSlot tuple_slot) {
+      tuple_slot_ = tuple_slot;
+      return *this;
+    }
+
+    /**
      * Build the delete plan node
      * @return plan node
      */
-    std::unique_ptr<DeletePlanNode> Build();
+    std::unique_ptr<TupleDeletePlanNode> Build();
 
    protected:
     /**
@@ -75,10 +86,14 @@ class DeletePlanNode : public AbstractPlanNode {
      * vector of indexes to delete from
      */
     std::vector<catalog::index_oid_t> index_oids_;
+
+    /**
+     * tuple slot to delete
+     */
+    storage::TupleSlot tuple_slot_;
   };
 
  private:
-  friend class TupleDeletePlanNode;
   /**
    * @param children child plan nodes
    * @param output_schema Schema representing the structure of the output of this plan node
@@ -88,19 +103,19 @@ class DeletePlanNode : public AbstractPlanNode {
    * @param index_oids indexes to delete from
    * @param plan_node_id Plan node id
    */
-  DeletePlanNode(std::vector<std::unique_ptr<AbstractPlanNode>> &&children, std::unique_ptr<OutputSchema> output_schema,
+  TupleDeletePlanNode(std::vector<std::unique_ptr<AbstractPlanNode>> &&children, std::unique_ptr<OutputSchema> output_schema,
                  catalog::db_oid_t database_oid, catalog::table_oid_t table_oid,
-                 std::vector<catalog::index_oid_t> &&index_oids, plan_node_id_t plan_node_id);
+                 std::vector<catalog::index_oid_t> &&index_oids, plan_node_id_t plan_node_id, storage::TupleSlot tuple_slot);
 
  public:
   /**
    * Default constructor used for deserialization
    */
-  DeletePlanNode() = default;
+  TupleDeletePlanNode() = default;
 
-  ~DeletePlanNode() override = default;
+  ~TupleDeletePlanNode() override = default;
 
-  DISALLOW_COPY_AND_MOVE(DeletePlanNode)
+  DISALLOW_COPY_AND_MOVE(TupleDeletePlanNode)
 
   /**
    * @return OID of the database
@@ -111,6 +126,11 @@ class DeletePlanNode : public AbstractPlanNode {
    * @return OID of the table to be deleted
    */
   catalog::table_oid_t GetTableOid() const { return table_oid_; }
+
+  /**
+   * @return tuple slot to perform the delete operation
+   */
+  storage::TupleSlot GetTupleSlot() const {return tuple_slot_; }
 
   /**
    * @return indexes to delete from
@@ -145,6 +165,11 @@ class DeletePlanNode : public AbstractPlanNode {
    * Indexes to delete from
    */
   std::vector<catalog::index_oid_t> index_oids_;
+
+  /**
+   * tuple slot to delete
+   */
+  storage::TupleSlot tuple_slot_;
 };
 
 DEFINE_JSON_HEADER_DECLARATIONS(DeletePlanNode);

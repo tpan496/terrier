@@ -33,7 +33,7 @@
 #include "execution/exec/execution_settings.h"
 #include "planner/plannodes/output_schema.h"
 #include "planner/plannodes/insert_plan_node.h"
-#include "planner/plannodes/delete_plan_node.h"
+#include "planner/plannodes/tuple_delete_plan_node.h"
 #include "execution/compiler/expression/expression_translator.h"
 #include "execution/exec/execution_context.h"
 
@@ -264,7 +264,7 @@ void RecoveryManager::ReplayRedoRecord(transaction::TransactionContext *txn, Log
     if (IsSpecialPGTables(table_oid)) {
       //STORAGE_LOG_ERROR("PG Tables");
     } else {
-      //InsertRedoRecordToInsertTranslator(txn, sql_table_ptr, redo_record, varlen_contents);
+      InsertRedoRecordToInsertTranslator(txn, sql_table_ptr, redo_record, varlen_contents);
       //return;
     }
 
@@ -305,8 +305,8 @@ void RecoveryManager::ReplayDeleteRecord(transaction::TransactionContext *txn, L
   auto db_catalog_ptr = GetDatabaseCatalog(txn, delete_record->GetDatabaseOid());
   auto sql_table_ptr = db_catalog_ptr->GetTable(common::ManagedPointer(txn), delete_record->GetTableOid());
   const auto &schema = GetTableSchema(txn, db_catalog_ptr, delete_record->GetTableOid());
-  //DeleteRecordToDeleteTranslator(txn, sql_table_ptr, delete_record);
-  //return;
+  DeleteRecordToDeleteTranslator(txn, sql_table_ptr, delete_record);
+  return;
   // Stage the delete. This way the recovery operation is logged if logging is enabled
   txn->StageDelete(delete_record->GetDatabaseOid(), delete_record->GetTableOid(), new_tuple_slot);
 
@@ -1294,9 +1294,10 @@ void RecoveryManager::DeleteRecordToDeleteTranslator(transaction::TransactionCon
   exec_settings.UpdateFromSettingsManager(settings_manager_);
 
   // Convert the redo record into a plannode.
-  planner::DeletePlanNode::Builder plan_builder;
+  planner::TupleDeletePlanNode::Builder plan_builder;
   plan_builder.SetDatabaseOid(delete_record->GetDatabaseOid());
   plan_builder.SetTableOid(delete_record->GetTableOid());
+  plan_builder.SetTupleSlot(delete_record->GetTupleSlot());
 
   // Stores index objects.
   std::vector<catalog::index_oid_t> index_oids = accessor->GetIndexOids(delete_record->GetTableOid());
@@ -1305,7 +1306,7 @@ void RecoveryManager::DeleteRecordToDeleteTranslator(transaction::TransactionCon
   // Q4. Insert type. How do I retrieve them? Could be values/select.
   plan_builder.SetOutputSchema(std::make_unique<planner::OutputSchema>());
   
-  std::unique_ptr<planner::DeletePlanNode> out_plan = plan_builder.Build();
+  std::unique_ptr<planner::TupleDeletePlanNode> out_plan = plan_builder.Build();
 
   // Compile the plannode.
   auto exec_query = execution::compiler::CompilationContext::Compile(*out_plan, exec_settings, accessor.get(),
