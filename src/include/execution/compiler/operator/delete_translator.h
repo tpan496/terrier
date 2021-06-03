@@ -91,6 +91,10 @@ class DeleteTranslator : public OperatorTranslator, public PipelineDriver {
   // Column oids of the table we are deleting from.
   ast::Identifier col_oids_;
 
+  // Codegen Replication only.
+  // Sets the tuple slot to delete.
+  ast::Identifier tuple_slot_;
+
   // The number of deletes that are performed.
   StateDescriptor::Entry num_deletes_;
 };

@@ -120,6 +120,8 @@ class DeletePlanNode : public AbstractPlanNode {
   /** @return the type of this plan node */
   PlanNodeType GetPlanNodeType() const override { return PlanNodeType::DELETE; }
 
+  bool UseTupleSlot() const { return false; }
+
   /** @return the hashed value of this plan node */
   common::hash_t Hash() const override;
 

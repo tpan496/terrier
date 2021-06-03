@@ -9,6 +9,7 @@
 #include "execution/compiler/if.h"
 #include "execution/compiler/work_context.h"
 #include "planner/plannodes/delete_plan_node.h"
+#include "planner/plannodes/tuple_delete_plan_node.h"
 #include "storage/index/index.h"
 
 namespace noisepage::execution::compiler {
@@ -17,8 +18,13 @@ DeleteTranslator::DeleteTranslator(const planner::DeletePlanNode &plan, Compilat
     : OperatorTranslator(plan, compilation_context, pipeline, selfdriving::ExecutionOperatingUnitType::DELETE),
       col_oids_(GetCodeGen()->MakeFreshIdentifier("col_oids")) {
   pipeline->RegisterSource(this, Pipeline::Parallelism::Serial);
-  // Prepare the child.
-  compilation_context->Prepare(*plan.GetChild(0), pipeline);
+  if (!plan.UseTupleSlot()) {
+    // Prepare the child.
+    compilation_context->Prepare(*plan.GetChild(0), pipeline);
+  } else {
+    //ast::Expr *tuple_slot_type = GetCodeGen()->BuiltinType(ast::BuiltinType::TupleSlot);
+    //tuple_slot_ = pipeline->DeclarePipelineStateEntry("tuple_slot", tuple_slot_type);
+  }
 
   auto &index_oids = GetPlanAs<planner::DeletePlanNode>().GetIndexOids();
   for (auto &index_oid : index_oids) {

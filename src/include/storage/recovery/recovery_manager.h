@@ -22,6 +22,7 @@
 #include "storage/sql_table.h"
 #include "loggers/storage_logger.h"
 #include "execution/sql/value_util.h"
+#include "execution/compiler/executable_query.h"
 
 namespace noisepage::settings {
 class SettingsManager;
@@ -41,83 +42,23 @@ class TransactionManager;
 
 namespace noisepage::storage {
 
-class ExpressionMaker {
- public:
+/**
+ * Recovery Manager
+ * TODO(Gus): Add more documentation when API is finalized
+ */
+class RecoveryManager : public common::DedicatedThreadOwner {
+
   using OwnedExpression = std::unique_ptr<parser::AbstractExpression>;
-  using ManagedExpression = common::ManagedPointer<parser::AbstractExpression>;
+  using ManagedExpression = common::ManagedPointer<parser::AbstractExpression>; 
 
   ManagedExpression MakeManaged(OwnedExpression &&expr) {
     owned_exprs_.emplace_back(std::move(expr));
     return ManagedExpression(owned_exprs_.back());
   }
 
-  /**
-   * Create a NULL constant expression
-   */
-  ManagedExpression Constant() {
-    return MakeManaged(
-        std::make_unique<parser::ConstantValueExpression>());
-  }
-
-  /**
-   * Create an boolean constant expression
-   */
-  ManagedExpression Constant(bool val) {
-    //STORAGE_LOG_ERROR(fmt::format("BOOLEAN: {}", val));
-    return MakeManaged(
-        std::make_unique<parser::ConstantValueExpression>(type::TypeId::BOOLEAN, execution::sql::BoolVal(val)));
-  }
-
-  /**
-   * Create an integer constant expression
-   */
-  ManagedExpression Constant(type::TypeId integer_type, int64_t val) {
-    return MakeManaged(
-        std::make_unique<parser::ConstantValueExpression>(integer_type, execution::sql::Integer(val)));
-  }
-
-  /**
-   * Create a double constant expression
-   */
-  ManagedExpression Constant(double val) {
-    return MakeManaged(
-        std::make_unique<parser::ConstantValueExpression>(type::TypeId::REAL, execution::sql::Real(val)));
-  }
-
-  /**
-   * Create a string constant expression
-   */
-  ManagedExpression Constant(const std::string &str) {
-    auto string_val = execution::sql::ValueUtil::CreateStringVal(str);
-    return MakeManaged(std::make_unique<parser::ConstantValueExpression>(type::TypeId::VARCHAR, string_val.first,
-                                                                         std::move(string_val.second)));
-  }
-
-  /**
-   * Create a date constant expression
-   */
-  ManagedExpression Constant(const execution::sql::Date date) {
-    return MakeManaged(std::make_unique<parser::ConstantValueExpression>(
-        type::TypeId::DATE, execution::sql::DateVal(date)));
-  }
-
-  /**
-   * Create a timestamp constant expression
-   */
-  ManagedExpression Constant(const execution::sql::Timestamp ts) {
-    return MakeManaged(std::make_unique<parser::ConstantValueExpression>(
-        type::TypeId::DATE, execution::sql::TimestampVal(ts)));
-  }
- private:
   // To ease memory management
   std::vector<OwnedExpression> owned_exprs_;
-};
 
-/**
- * Recovery Manager
- * TODO(Gus): Add more documentation when API is finalized
- */
-class RecoveryManager : public common::DedicatedThreadOwner {
   /**
    * Task in charge of initializing recovery. This way recovery can be non-blocking in a background thread.
    */
@@ -503,5 +444,12 @@ class RecoveryManager : public common::DedicatedThreadOwner {
   void DeleteRecordToDeleteTranslator(transaction::TransactionContext *txn,
                                           common::ManagedPointer<storage::SqlTable> sql_table,
                                           storage::DeleteRecord *delete_record);
+
+  /**
+   * Information about cached executable queries
+   * Assumes that the query string is a unique identifier.
+   */
+  //std::unordered_map<std::string, std::unique_ptr<planner::OutputSchema>> schemas_;
+  std::unordered_map<std::string, std::unique_ptr<execution::compiler::ExecutableQuery>> exec_queries_;
 };
 }  // namespace noisepage::storage
