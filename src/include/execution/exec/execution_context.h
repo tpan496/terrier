@@ -348,7 +348,7 @@ class EXPORT ExecutionContext {
    * Gets the tuple slot used for an Insert.
    * @return tuple slot
    */
-  storage::TupleSlot GetTupleSlot() { return tuple_slot_; }
+  storage::TupleSlot* GetTupleSlot() { return &tuple_slot_; }
 
  private:
   query_id_t query_id_{execution::query_id_t(0)};

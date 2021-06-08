@@ -264,7 +264,7 @@ void RecoveryManager::ReplayRedoRecord(transaction::TransactionContext *txn, Log
     if (IsSpecialPGTables(table_oid)) {
       //STORAGE_LOG_ERROR("PG Tables");
     } else {
-      InsertRedoRecordToInsertTranslator(txn, sql_table_ptr, redo_record, varlen_contents);
+      //InsertRedoRecordToInsertTranslator(txn, sql_table_ptr, redo_record, varlen_contents);
       //return;
     }
 
@@ -305,8 +305,8 @@ void RecoveryManager::ReplayDeleteRecord(transaction::TransactionContext *txn, L
   auto db_catalog_ptr = GetDatabaseCatalog(txn, delete_record->GetDatabaseOid());
   auto sql_table_ptr = db_catalog_ptr->GetTable(common::ManagedPointer(txn), delete_record->GetTableOid());
   const auto &schema = GetTableSchema(txn, db_catalog_ptr, delete_record->GetTableOid());
-  //DeleteRecordToDeleteTranslator(txn, sql_table_ptr, delete_record);
-  //return;
+  DeleteRecordToDeleteTranslator(txn, sql_table_ptr, delete_record, new_tuple_slot);
+  return;
   // Stage the delete. This way the recovery operation is logged if logging is enabled
   txn->StageDelete(delete_record->GetDatabaseOid(), delete_record->GetTableOid(), new_tuple_slot);
 
@@ -1203,7 +1203,6 @@ void RecoveryManager::InsertRedoRecordToInsertTranslator(transaction::Transactio
       auto col = cols[col_oid];
       if (raw_bytes == nullptr) {
         expr = parser::ConstantValueExpression();
-        //STORAGE_LOG_ERROR("NULL");
       } else {
         switch (type_id) {
           case execution::sql::TypeId::Boolean: {
@@ -1267,6 +1266,8 @@ void RecoveryManager::InsertRedoRecordToInsertTranslator(transaction::Transactio
     planner::InsertPlanNode::Builder plan_builder;
     plan_builder.SetDatabaseOid(redo_record->GetDatabaseOid());
     plan_builder.SetTableOid(redo_record->GetTableOid());
+    plan_builder.SetInsertType(parser::InsertType::VALUES);
+    plan_builder.SetOutputSchema(std::make_unique<planner::OutputSchema>());
 
     for (const auto &col : schema.GetColumns()) {
       plan_builder.AddParameterInfo(col.Oid());
@@ -1277,10 +1278,6 @@ void RecoveryManager::InsertRedoRecordToInsertTranslator(transaction::Transactio
     // Stores index objects.
     std::vector<catalog::index_oid_t> index_oids = accessor->GetIndexOids(redo_record->GetTableOid());
     plan_builder.SetIndexOids(std::move(index_oids));
-
-    // Q4. Insert type. How do I retrieve them? Could be values/select.
-    plan_builder.SetInsertType(parser::InsertType::VALUES);
-    plan_builder.SetOutputSchema(std::make_unique<planner::OutputSchema>());
     
     std::unique_ptr<planner::InsertPlanNode> out_plan = plan_builder.Build();
 
@@ -1293,21 +1290,21 @@ void RecoveryManager::InsertRedoRecordToInsertTranslator(transaction::Transactio
   auto exec_ctx = std::make_unique<execution::exec::ExecutionContext>(
       redo_record->GetDatabaseOid(), common::ManagedPointer<transaction::TransactionContext>(txn), callback,
                                         out_schema.get(), common::ManagedPointer<catalog::CatalogAccessor>(accessor), exec_settings, DISABLED, DISABLED, DISABLED);
-  //if (found) {
-  exec_ctx->SetParams(common::ManagedPointer<const std::vector<parser::ConstantValueExpression>>(&params));
-  //}
-  //NOISEPAGE_ASSERT(!txn->MustAbort(), "Transaction should not be in must-abort state prior to executing");
+  if (found) {
+    exec_ctx->SetParams(common::ManagedPointer<const std::vector<parser::ConstantValueExpression>>(&params));
+  }
   exec_queries_[query_identifier]->Run(common::ManagedPointer(exec_ctx), execution::vm::ExecutionMode::Interpret);
-  //exec_query->Run(common::ManagedPointer(exec_ctx), execution::vm::ExecutionMode::Interpret);
 
-  auto new_tuple_slot = exec_ctx->GetTupleSlot();
+  // Update tuple slots.
+  auto new_tuple_slot = *exec_ctx->GetTupleSlot();
   auto old_tuple_slot = redo_record->GetTupleSlot();
   tuple_slot_map_[old_tuple_slot] = new_tuple_slot;
 }
 
 void RecoveryManager::DeleteRecordToDeleteTranslator(transaction::TransactionContext *txn,
                                                          common::ManagedPointer<storage::SqlTable> sql_table,
-                                                         storage::DeleteRecord *delete_record) {
+                                                         storage::DeleteRecord *delete_record,
+                                                         storage::TupleSlot new_tuple_slot) {
   std::unique_ptr<catalog::CatalogAccessor> accessor =
       catalog_->GetAccessor(common::ManagedPointer(txn), delete_record->GetDatabaseOid(), DISABLED);
   
@@ -1318,16 +1315,17 @@ void RecoveryManager::DeleteRecordToDeleteTranslator(transaction::TransactionCon
   planner::TupleDeletePlanNode::Builder plan_builder;
   plan_builder.SetDatabaseOid(delete_record->GetDatabaseOid());
   plan_builder.SetTableOid(delete_record->GetTableOid());
-  plan_builder.SetTupleSlot(delete_record->GetTupleSlot());
+  //plan_builder.SetTupleSlot(new_tuple_slot);
 
   // Stores index objects.
-  std::vector<catalog::index_oid_t> index_oids = accessor->GetIndexOids(delete_record->GetTableOid());
-  plan_builder.SetIndexOids(std::move(index_oids));
+  //std::vector<catalog::index_oid_t> index_oids = accessor->GetIndexOids(delete_record->GetTableOid());
+  //plan_builder.SetIndexOids(std::move(index_oids));
 
   // Q4. Insert type. How do I retrieve them? Could be values/select.
   plan_builder.SetOutputSchema(std::make_unique<planner::OutputSchema>());
   
   std::unique_ptr<planner::TupleDeletePlanNode> out_plan = plan_builder.Build();
+  out_plan->SetUseTupleSlot(true);
 
   // Compile the plannode.
   auto exec_query = execution::compiler::CompilationContext::Compile(*out_plan, exec_settings, accessor.get(),
@@ -1337,9 +1335,28 @@ void RecoveryManager::DeleteRecordToDeleteTranslator(transaction::TransactionCon
   auto exec_ctx = std::make_unique<execution::exec::ExecutionContext>(
       delete_record->GetDatabaseOid(), common::ManagedPointer<transaction::TransactionContext>(txn), callback,
                                         out_plan->GetOutputSchema().Get(), common::ManagedPointer<catalog::CatalogAccessor>(accessor), exec_settings, DISABLED, DISABLED, DISABLED);
+  exec_ctx->SetTupleSlot(new_tuple_slot);
   exec_query->Run(common::ManagedPointer(exec_ctx), execution::vm::ExecutionMode::Interpret);
 
-  auto new_tuple_slot = exec_ctx->GetTupleSlot();
+  // Process Index
+  // Fetch all the values so we can construct index keys after deleting from the sql table
+  auto db_catalog_ptr = GetDatabaseCatalog(txn, delete_record->GetDatabaseOid());
+  const auto &schema = GetTableSchema(txn, db_catalog_ptr, delete_record->GetTableOid());
+  std::vector<catalog::col_oid_t> all_table_oids;
+  for (const auto &col : schema.GetColumns()) {
+    all_table_oids.push_back(col.Oid());
+  }
+  auto sql_table_ptr = db_catalog_ptr->GetTable(common::ManagedPointer(txn), delete_record->GetTableOid());
+  auto initializer = sql_table_ptr->InitializerForProjectedRow(all_table_oids);
+  auto *buffer = common::AllocationUtil::AllocateAligned(initializer.ProjectedRowSize());
+  auto pr = initializer.InitializeRow(buffer);
+  sql_table_ptr->Select(common::ManagedPointer(txn), new_tuple_slot, pr);
+
+  // Delete from the indexes
+  UpdateIndexesOnTable(txn, delete_record->GetDatabaseOid(), delete_record->GetTableOid(), sql_table_ptr,
+                       new_tuple_slot, pr, false /* delete */);
+  delete[] buffer;
+  
   tuple_slot_map_.erase(new_tuple_slot);
 }
 

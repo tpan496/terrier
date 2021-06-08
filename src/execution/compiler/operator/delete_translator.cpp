@@ -22,8 +22,8 @@ DeleteTranslator::DeleteTranslator(const planner::DeletePlanNode &plan, Compilat
     // Prepare the child.
     compilation_context->Prepare(*plan.GetChild(0), pipeline);
   } else {
-    //ast::Expr *tuple_slot_type = GetCodeGen()->BuiltinType(ast::BuiltinType::TupleSlot);
-    //tuple_slot_ = pipeline->DeclarePipelineStateEntry("tuple_slot", tuple_slot_type);
+    ast::Expr *tuple_slot_type = GetCodeGen()->BuiltinType(ast::BuiltinType::TupleSlot);
+    tuple_slot_ = pipeline->DeclarePipelineStateEntry("tuple_slot", tuple_slot_type);
   }
 
   auto &index_oids = GetPlanAs<planner::DeletePlanNode>().GetIndexOids();
@@ -89,20 +89,35 @@ void DeleteTranslator::GenDeleterFree(FunctionBuilder *builder) const {
 void DeleteTranslator::GenTableDelete(FunctionBuilder *builder) const {
   // if (!@tableDelete(&pipelineState.storageInterface, &slot)) { Abort(); }
   const auto &op = GetPlanAs<planner::DeletePlanNode>();
-  const auto &child = GetCompilationContext()->LookupTranslator(*op.GetChild(0));
-  NOISEPAGE_ASSERT(child != nullptr, "delete should have a child");
-  const auto &delete_slot = child->GetSlotAddress();
-  std::vector<ast::Expr *> delete_args{si_deleter_.GetPtr(GetCodeGen()), delete_slot};
-  auto *delete_call = GetCodeGen()->CallBuiltin(ast::Builtin::TableDelete, delete_args);
-  auto *delete_failed = GetCodeGen()->UnaryOp(parsing::Token::Type::BANG, delete_call);
-  If check(builder, delete_failed);
-  {
-    // The delete was not successful; abort the transaction.
-    builder->Append(GetCodeGen()->AbortTxn(GetExecutionContext()));
+  if (op.UseTupleSlot()) {
+    std::vector<ast::Expr *> delete_args{si_deleter_.GetPtr(GetCodeGen()), tuple_slot_.GetPtr(GetCodeGen())};
+    auto *delete_call = GetCodeGen()->CallBuiltin(ast::Builtin::TableDelete, delete_args);
+    auto *delete_failed = GetCodeGen()->UnaryOp(parsing::Token::Type::BANG, delete_call);
+    If check(builder, delete_failed);
+    {
+      // The delete was not successful; abort the transaction.
+      //CounterAdd(builder, num_deletes_, 1);
+      builder->Append(GetCodeGen()->AbortTxn(GetExecutionContext()));
+    }
+    check.Else();
+    { CounterAdd(builder, num_deletes_, 1); }
+    check.EndIf();
+  } else {
+    const auto &child = GetCompilationContext()->LookupTranslator(*op.GetChild(0));
+    NOISEPAGE_ASSERT(child != nullptr, "delete should have a child");
+    const auto &delete_slot = child->GetSlotAddress();
+    std::vector<ast::Expr *> delete_args{si_deleter_.GetPtr(GetCodeGen()), delete_slot};
+    auto *delete_call = GetCodeGen()->CallBuiltin(ast::Builtin::TableDelete, delete_args);
+    auto *delete_failed = GetCodeGen()->UnaryOp(parsing::Token::Type::BANG, delete_call);
+    If check(builder, delete_failed);
+    {
+      // The delete was not successful; abort the transaction.
+      builder->Append(GetCodeGen()->AbortTxn(GetExecutionContext()));
+    }
+    check.Else();
+    { CounterAdd(builder, num_deletes_, 1); }
+    check.EndIf();
   }
-  check.Else();
-  { CounterAdd(builder, num_deletes_, 1); }
-  check.EndIf();
 }
 
 void DeleteTranslator::GenIndexDelete(FunctionBuilder *builder, WorkContext *context,
@@ -120,6 +135,7 @@ void DeleteTranslator::GenIndexDelete(FunctionBuilder *builder, WorkContext *con
   const auto &index_cols = index_schema.GetColumns();
 
   const auto &op = GetPlanAs<planner::DeletePlanNode>();
+  OPTIMIZER_LOG_ERROR("Gen index delete");
   const auto &child = GetCompilationContext()->LookupTranslator(*op.GetChild(0));
   for (const auto &index_col : index_cols) {
     // @prSetCall(delete_index_pr, type, nullable, attr_idx, val)

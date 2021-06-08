@@ -2112,8 +2112,14 @@ void VM::Interpret(const uint8_t *ip, Frame *frame) {  // NOLINT
     auto *storage_interface = frame->LocalAt<sql::StorageInterface *>(READ_LOCAL_ID());
     auto *tuple_slot = frame->LocalAt<storage::TupleSlot *>(READ_LOCAL_ID());
 
-    OpStorageInterfaceTableDelete(result, storage_interface, tuple_slot);
-    storage_interface->GetExecutionContext()->SetTupleSlot(*tuple_slot);
+    if (*storage_interface->GetExecutionContext()->GetTupleSlot() == storage::TupleSlot()) {
+      //EXECUTION_LOG_ERROR("Regular Table Delete");
+      OpStorageInterfaceTableDelete(result, storage_interface, tuple_slot);
+    } else {
+      //EXECUTION_LOG_ERROR("VM Tuple Slot: {}", *storage_interface->GetExecutionContext()->GetTupleSlot());
+      OpStorageInterfaceTableDelete(result, storage_interface, storage_interface->GetExecutionContext()->GetTupleSlot());
+    }
+    
     DISPATCH_NEXT();
   }
 

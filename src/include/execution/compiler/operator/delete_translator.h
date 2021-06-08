@@ -93,7 +93,8 @@ class DeleteTranslator : public OperatorTranslator, public PipelineDriver {
 
   // Codegen Replication only.
   // Sets the tuple slot to delete.
-  ast::Identifier tuple_slot_;
+    // thread local tuple slot
+  StateDescriptor::Entry tuple_slot_;
 
   // The number of deletes that are performed.
   StateDescriptor::Entry num_deletes_;

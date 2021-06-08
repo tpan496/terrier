@@ -443,7 +443,8 @@ class RecoveryManager : public common::DedicatedThreadOwner {
 
   void DeleteRecordToDeleteTranslator(transaction::TransactionContext *txn,
                                           common::ManagedPointer<storage::SqlTable> sql_table,
-                                          storage::DeleteRecord *delete_record);
+                                          storage::DeleteRecord *delete_record,
+                                          storage::TupleSlot new_tuple_slot);
 
   /**
    * Information about cached executable queries
