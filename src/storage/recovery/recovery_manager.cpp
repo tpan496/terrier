@@ -36,6 +36,8 @@
 #include "planner/plannodes/tuple_delete_plan_node.h"
 #include "execution/compiler/expression/expression_translator.h"
 #include "execution/exec/execution_context.h"
+//#include "parser/expression/constant_value_expression.h"
+#include "parser/expression/parameter_value_expression.h"
 
 namespace noisepage::storage {
 
@@ -264,8 +266,8 @@ void RecoveryManager::ReplayRedoRecord(transaction::TransactionContext *txn, Log
     if (IsSpecialPGTables(table_oid)) {
       //STORAGE_LOG_ERROR("PG Tables");
     } else {
-      //InsertRedoRecordToInsertTranslator(txn, sql_table_ptr, redo_record, varlen_contents);
-      //return;
+      InsertRedoRecordToInsertTranslator(txn, sql_table_ptr, redo_record, varlen_contents);
+      return;
     }
 
     // Save the old tuple slot, and reset the tuple slot in the record
@@ -305,8 +307,8 @@ void RecoveryManager::ReplayDeleteRecord(transaction::TransactionContext *txn, L
   auto db_catalog_ptr = GetDatabaseCatalog(txn, delete_record->GetDatabaseOid());
   auto sql_table_ptr = db_catalog_ptr->GetTable(common::ManagedPointer(txn), delete_record->GetTableOid());
   const auto &schema = GetTableSchema(txn, db_catalog_ptr, delete_record->GetTableOid());
-  DeleteRecordToDeleteTranslator(txn, sql_table_ptr, delete_record, new_tuple_slot);
-  return;
+  //DeleteRecordToDeleteTranslator(txn, sql_table_ptr, delete_record, new_tuple_slot);
+  //return;
   // Stage the delete. This way the recovery operation is logged if logging is enabled
   txn->StageDelete(delete_record->GetDatabaseOid(), delete_record->GetTableOid(), new_tuple_slot);
 
@@ -1199,56 +1201,66 @@ void RecoveryManager::InsertRedoRecordToInsertTranslator(transaction::Transactio
       type::TypeId value_type = col_types[col_oid];
       const auto type_id = execution::sql::GetTypeId(value_type);
       byte *raw_bytes = redo_record->Delta()->AccessWithNullCheck(i);
-      parser::ConstantValueExpression expr;
+      common::ManagedPointer<parser::AbstractExpression> expr;
+      parser::ConstantValueExpression param;
       auto col = cols[col_oid];
       if (raw_bytes == nullptr) {
-        expr = parser::ConstantValueExpression();
+        param = parser::ConstantValueExpression();
       } else {
         switch (type_id) {
           case execution::sql::TypeId::Boolean: {
             auto val = *(reinterpret_cast<bool *>(raw_bytes));
-            expr = parser::ConstantValueExpression(type::TypeId::BOOLEAN, execution::sql::BoolVal(val));
+            expr = MakeManaged(std::make_unique<parser::ParameterValueExpression>(static_cast<uint32_t>(col_oid)-1, type::TypeId::BOOLEAN));
+            param = parser::ConstantValueExpression(type::TypeId::BOOLEAN, execution::sql::BoolVal(val));
             break;
           }
           case execution::sql::TypeId::TinyInt: {
             auto val = *(reinterpret_cast<int64_t *>(reinterpret_cast<int8_t *>(raw_bytes)));
-            expr = parser::ConstantValueExpression(type::TypeId::TINYINT, execution::sql::Integer(val));
+            expr = MakeManaged(std::make_unique<parser::ParameterValueExpression>(static_cast<uint32_t>(col_oid)-1, type::TypeId::TINYINT));
+            param = parser::ConstantValueExpression(type::TypeId::TINYINT, execution::sql::Integer(val));
             break;
           }
           case execution::sql::TypeId::SmallInt: {
             auto val = *(reinterpret_cast<int64_t *>(reinterpret_cast<int16_t *>(raw_bytes)));
-            expr = parser::ConstantValueExpression(type::TypeId::SMALLINT, execution::sql::Integer(val));
+            expr = MakeManaged(std::make_unique<parser::ParameterValueExpression>(static_cast<uint32_t>(col_oid)-1, type::TypeId::SMALLINT));
+            param = parser::ConstantValueExpression(type::TypeId::SMALLINT, execution::sql::Integer(val));
             break;
           }
           case execution::sql::TypeId::Integer: {
             auto val = *(reinterpret_cast<int64_t *>(reinterpret_cast<int32_t *>(raw_bytes)));
-            expr = parser::ConstantValueExpression(type::TypeId::INTEGER, execution::sql::Integer(val));
+            expr = MakeManaged(std::make_unique<parser::ParameterValueExpression>(static_cast<uint32_t>(col_oid)-1, type::TypeId::INTEGER));
+            param = parser::ConstantValueExpression(type::TypeId::INTEGER, execution::sql::Integer(val));
             break;
           }
           case execution::sql::TypeId::BigInt: {
             auto val = *(reinterpret_cast<int64_t *>(raw_bytes));
-            expr = parser::ConstantValueExpression(type::TypeId::BIGINT, execution::sql::Integer(val));
+            expr = MakeManaged(std::make_unique<parser::ParameterValueExpression>(static_cast<uint32_t>(col_oid)-1, type::TypeId::BIGINT));
+            param = parser::ConstantValueExpression(type::TypeId::BIGINT, execution::sql::Integer(val));
             break;
           }
           case execution::sql::TypeId::Double: {
             auto val = *(reinterpret_cast<double *>(raw_bytes));
-            expr = parser::ConstantValueExpression(type::TypeId::REAL, execution::sql::Real(val));
+            expr = MakeManaged(std::make_unique<parser::ParameterValueExpression>(static_cast<uint32_t>(col_oid)-1, type::TypeId::REAL));
+            param = parser::ConstantValueExpression(type::TypeId::REAL, execution::sql::Real(val));
             break;
           }
           case execution::sql::TypeId::Date: {
             auto date = execution::sql::Date::FromNative(*(reinterpret_cast<int32_t *>(raw_bytes)));
-            expr = parser::ConstantValueExpression(type::TypeId::DATE, execution::sql::DateVal(date));
+            expr = MakeManaged(std::make_unique<parser::ParameterValueExpression>(static_cast<uint32_t>(col_oid)-1, type::TypeId::DATE));
+            param = parser::ConstantValueExpression(type::TypeId::DATE, execution::sql::DateVal(date));
             break;
           }
           case execution::sql::TypeId::Timestamp: {
             auto ts = execution::sql::Timestamp::FromNative(*(reinterpret_cast<uint64_t *>(raw_bytes)));
-            expr = parser::ConstantValueExpression(type::TypeId::TINYINT, execution::sql::TimestampVal(ts));
+            //expr = parser::ParameterValueExpression(static_cast<uint32_t>(col_oid)-1, type::TypeId::TINYINT);
+            param = parser::ConstantValueExpression(type::TypeId::TINYINT, execution::sql::TimestampVal(ts));
             break;
           }
           case execution::sql::TypeId::Varchar: {
             const auto *entry = reinterpret_cast<VarlenEntry *>(raw_bytes);
             auto string_val = execution::sql::ValueUtil::CreateStringVal(std::string(entry->StringView()));
-            expr = parser::ConstantValueExpression(type::TypeId::VARCHAR, string_val.first,
+            expr = MakeManaged(std::make_unique<parser::ParameterValueExpression>(static_cast<uint32_t>(col_oid)-1, type::TypeId::VARCHAR));
+            param = parser::ConstantValueExpression(type::TypeId::VARCHAR, string_val.first,
                                                                          std::move(string_val.second));
             break;
           }
@@ -1256,9 +1268,9 @@ void RecoveryManager::InsertRedoRecordToInsertTranslator(transaction::Transactio
             throw NOT_IMPLEMENTED_EXCEPTION(fmt::format("Translation of constant type {}", TypeIdToString(type_id)));
         }
       }
-      auto managed_expr = MakeManaged(std::make_unique<parser::ConstantValueExpression>(expr));
-      values[static_cast<uint32_t>(col_oid)-1] = managed_expr;
-      params[static_cast<uint32_t>(col_oid)-1] = expr;
+      //auto managed_expr = MakeManaged(expr.Copy());
+      values[static_cast<uint32_t>(col_oid)-1] = expr;
+      params[static_cast<uint32_t>(col_oid)-1] = param;
     }
   }
   if (!found) {
@@ -1290,10 +1302,10 @@ void RecoveryManager::InsertRedoRecordToInsertTranslator(transaction::Transactio
   auto exec_ctx = std::make_unique<execution::exec::ExecutionContext>(
       redo_record->GetDatabaseOid(), common::ManagedPointer<transaction::TransactionContext>(txn), callback,
                                         out_schema.get(), common::ManagedPointer<catalog::CatalogAccessor>(accessor), exec_settings, DISABLED, DISABLED, DISABLED);
-  if (found) {
+  //if (found) {
     exec_ctx->SetParams(common::ManagedPointer<const std::vector<parser::ConstantValueExpression>>(&params));
-  }
-  exec_queries_[query_identifier]->Run(common::ManagedPointer(exec_ctx), execution::vm::ExecutionMode::Interpret);
+  //}
+  exec_queries_[query_identifier]->Run(common::ManagedPointer(exec_ctx), execution::vm::ExecutionMode::Compiled);
 
   // Update tuple slots.
   auto new_tuple_slot = *exec_ctx->GetTupleSlot();
@@ -1321,7 +1333,6 @@ void RecoveryManager::DeleteRecordToDeleteTranslator(transaction::TransactionCon
   //std::vector<catalog::index_oid_t> index_oids = accessor->GetIndexOids(delete_record->GetTableOid());
   //plan_builder.SetIndexOids(std::move(index_oids));
 
-  // Q4. Insert type. How do I retrieve them? Could be values/select.
   plan_builder.SetOutputSchema(std::make_unique<planner::OutputSchema>());
   
   std::unique_ptr<planner::TupleDeletePlanNode> out_plan = plan_builder.Build();
