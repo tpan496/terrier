@@ -274,7 +274,7 @@ void RecoveryManager::ReplayRedoRecord(transaction::TransactionContext *txn, Log
       //STORAGE_LOG_ERROR("PG Tables");
     } else {
       InsertRedoRecordToInsertTranslator(txn, sql_table_ptr, redo_record, varlen_contents);
-      return;
+      //return;
     }
 
     // Save the old tuple slot, and reset the tuple slot in the record
@@ -1336,6 +1336,7 @@ void RecoveryManager::InsertRedoRecordToInsertTranslator(transaction::Transactio
   //if (found) {
     exec_ctx->SetParams(common::ManagedPointer<const std::vector<parser::ConstantValueExpression>>(&params));
   //}
+  return;
   exec_queries_[query_identifier]->Run(common::ManagedPointer(exec_ctx), execution::vm::ExecutionMode::Interpret);
 
   // Update tuple slots.
