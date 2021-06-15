@@ -1189,6 +1189,7 @@ void RecoveryManager::InsertRedoRecordToInsertTranslator(transaction::Transactio
   // Find col_oids from the catalog.
   std::unordered_map<catalog::col_oid_t, type::TypeId> col_types;
   std::unordered_map<catalog::col_oid_t, catalog::Schema::Column> cols;
+  std::unordered_map<col_id_t, catalog::col_oid_t> id_to_oid;
   catalog::Schema schema;
   if (all_col_types_.find(query_identifier) == all_col_types_.end()) {
     auto db_catalog_ptr = GetDatabaseCatalog(txn, redo_record->GetDatabaseOid());
@@ -1200,13 +1201,24 @@ void RecoveryManager::InsertRedoRecordToInsertTranslator(transaction::Transactio
       cols[col.Oid()] = col;
     }
 
+    for (uint16_t i = 0; i < redo_record->Delta()->NumColumns(); i++) {
+      col_id_t col_id = redo_record->Delta()->ColumnIds()[i];
+      // We should ingore the version pointer column, this is a hidden storage layer column
+      if (col_id != VERSION_POINTER_COLUMN_ID) {
+        catalog::col_oid_t col_oid = sql_table->OidForColId(col_id);
+        id_to_oid[col_id] = col_oid;
+      }
+    }
+
     all_col_types_[query_identifier] = col_types;
     all_cols_[query_identifier] = cols;
     schemas_[query_identifier] = schema;
+    ids_to_oids_[query_identifier] = id_to_oid;
   } else {
     col_types = all_col_types_[query_identifier];
     cols = all_cols_[query_identifier];
     schema = schemas_[query_identifier];
+    id_to_oid = ids_to_oids_[query_identifier];
   }
 
   std::vector<common::ManagedPointer<parser::AbstractExpression>> values(redo_record->Delta()->NumColumns());
@@ -1216,7 +1228,7 @@ void RecoveryManager::InsertRedoRecordToInsertTranslator(transaction::Transactio
     col_id_t col_id = redo_record->Delta()->ColumnIds()[i];
     // We should ingore the version pointer column, this is a hidden storage layer column
     if (col_id != VERSION_POINTER_COLUMN_ID) {
-      catalog::col_oid_t col_oid = sql_table->OidForColId(col_id);
+      catalog::col_oid_t col_oid = id_to_oid[col_id];
       type::TypeId value_type = col_types[col_oid];
       const auto type_id = execution::sql::GetTypeId(value_type);
       byte *raw_bytes = redo_record->Delta()->AccessWithNullCheck(i);
