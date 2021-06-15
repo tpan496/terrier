@@ -1188,7 +1188,7 @@ void RecoveryManager::InsertRedoRecordToInsertTranslator(transaction::Transactio
 
   // Find col_oids from the catalog.
   catalog::Schema schema;
-  if (!found) {
+  if (all_col_types_.find(query_identifier) == all_col_types_.end()) {
     std::unordered_map<catalog::col_oid_t, type::TypeId> col_types;
     std::unordered_map<catalog::col_oid_t, catalog::Schema::Column> cols;
     std::unordered_map<col_id_t, catalog::col_oid_t> id_to_oid;
