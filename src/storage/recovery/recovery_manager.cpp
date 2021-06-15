@@ -1221,6 +1221,8 @@ void RecoveryManager::InsertRedoRecordToInsertTranslator(transaction::Transactio
     id_to_oid = ids_to_oids_[query_identifier];
   }
 
+  return;
+
   std::vector<common::ManagedPointer<parser::AbstractExpression>> values(redo_record->Delta()->NumColumns());
   std::vector<parser::ConstantValueExpression> params(redo_record->Delta()->NumColumns());
   owned_exprs_.clear();
@@ -1305,7 +1307,6 @@ void RecoveryManager::InsertRedoRecordToInsertTranslator(transaction::Transactio
     }
   }
 
-  return;
   if (!found) {
     // Convert the redo record into a plannode.
     planner::InsertPlanNode::Builder plan_builder;
