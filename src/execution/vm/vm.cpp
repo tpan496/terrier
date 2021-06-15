@@ -2103,7 +2103,6 @@ void VM::Interpret(const uint8_t *ip, Frame *frame) {  // NOLINT
     auto *storage_interface = frame->LocalAt<sql::StorageInterface *>(READ_LOCAL_ID());
 
     OpStorageInterfaceTableInsert(tuple_slot, storage_interface);
-    storage_interface->GetExecutionContext()->SetTupleSlot(*tuple_slot);
     DISPATCH_NEXT();
   }
 
