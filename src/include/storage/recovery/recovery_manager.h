@@ -450,12 +450,11 @@ class RecoveryManager : public common::DedicatedThreadOwner {
    * Information about cached executable queries
    * Assumes that the query string is a unique identifier.
    */
-  //std::unordered_map<std::string, std::unique_ptr<planner::OutputSchema>> schemas_;
-  std::unordered_map<std::string, std::unique_ptr<execution::compiler::ExecutableQuery>> exec_queries_;
+  std::map<std::pair<uint32_t, uint32_t>, std::unique_ptr<execution::compiler::ExecutableQuery>> exec_queries_;
 
-  std::unordered_map<std::string, std::unordered_map<catalog::col_oid_t, type::TypeId>>  all_col_types_;
-  std::unordered_map<std::string, std::unordered_map<catalog::col_oid_t, catalog::Schema::Column>> all_cols_;
-  std::unordered_map<std::string, catalog::Schema> schemas_;
-  std::unordered_map<std::string, std::unordered_map<col_id_t, catalog::col_oid_t>> ids_to_oids_;
+  std::map<std::pair<uint32_t, uint32_t>, std::unordered_map<catalog::col_oid_t, type::TypeId>>  all_col_types_;
+  std::map<std::pair<uint32_t, uint32_t>, std::unordered_map<catalog::col_oid_t, catalog::Schema::Column>> all_cols_;
+  std::map<std::pair<uint32_t, uint32_t>, catalog::Schema> schemas_;
+  std::map<std::pair<uint32_t, uint32_t>, std::unordered_map<col_id_t, catalog::col_oid_t>> ids_to_oids_;
 };
 }  // namespace noisepage::storage

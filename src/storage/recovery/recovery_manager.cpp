@@ -1182,8 +1182,7 @@ void RecoveryManager::InsertRedoRecordToInsertTranslator(transaction::Transactio
   execution::exec::ExecutionSettings exec_settings{};
   exec_settings.UpdateFromSettingsManager(settings_manager_);
   auto out_schema = std::make_unique<planner::OutputSchema>();
-  //bool found = false;
-  const std::string query_identifier = "db_" + std::to_string(static_cast<uint32_t>(redo_record->GetDatabaseOid())) + "_tb_" + std::to_string(static_cast<uint32_t>(redo_record->GetTableOid()));
+  const auto query_identifier = std::make_pair(static_cast<uint32_t>(redo_record->GetDatabaseOid()), static_cast<uint32_t>(redo_record->GetTableOid()));
   bool found = exec_queries_.find(query_identifier) != exec_queries_.end();
 
   // Find col_oids from the catalog.
@@ -1297,7 +1296,6 @@ void RecoveryManager::InsertRedoRecordToInsertTranslator(transaction::Transactio
             throw NOT_IMPLEMENTED_EXCEPTION(fmt::format("Translation of constant type {}", TypeIdToString(type_id)));
         }
       }
-      //auto managed_expr = MakeManaged(expr.Copy());
       values[static_cast<uint32_t>(col_oid)-1] = expr;
       params[static_cast<uint32_t>(col_oid)-1] = param;
     }
