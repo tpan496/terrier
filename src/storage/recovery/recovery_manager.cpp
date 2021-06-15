@@ -1187,14 +1187,26 @@ void RecoveryManager::InsertRedoRecordToInsertTranslator(transaction::Transactio
   bool found = exec_queries_.find(query_identifier) != exec_queries_.end();
 
   // Find col_oids from the catalog.
-  auto db_catalog_ptr = GetDatabaseCatalog(txn, redo_record->GetDatabaseOid());
-  const auto &schema = GetTableSchema(txn, db_catalog_ptr, redo_record->GetTableOid());
   std::unordered_map<catalog::col_oid_t, type::TypeId> col_types;
   std::unordered_map<catalog::col_oid_t, catalog::Schema::Column> cols;
-  for (const auto &col : schema.GetColumns()) {
-    common::ManagedPointer<parser::AbstractExpression> expression = col.StoredExpressionNotConst();
-    col_types[col.Oid()] = expression->GetReturnValueType();
-    cols[col.Oid()] = col;
+  catalog::Schema schema;
+  if (all_col_types_.find(query_identifier) == all_col_types_.end()) {
+    auto db_catalog_ptr = GetDatabaseCatalog(txn, redo_record->GetDatabaseOid());
+    schema = GetTableSchema(txn, db_catalog_ptr, redo_record->GetTableOid());
+    
+    for (const auto &col : schema.GetColumns()) {
+      common::ManagedPointer<parser::AbstractExpression> expression = col.StoredExpressionNotConst();
+      col_types[col.Oid()] = expression->GetReturnValueType();
+      cols[col.Oid()] = col;
+    }
+
+    all_col_types_[query_identifier] = col_types;
+    all_cols_[query_identifier] = cols;
+    schemas_[query_identifier] = schema;
+  } else {
+    col_types = all_col_types_[query_identifier];
+    cols = all_cols_[query_identifier];
+    schema = schemas_[query_identifier];
   }
 
   std::vector<common::ManagedPointer<parser::AbstractExpression>> values(redo_record->Delta()->NumColumns());
@@ -1312,13 +1324,12 @@ void RecoveryManager::InsertRedoRecordToInsertTranslator(transaction::Transactio
   //if (found) {
     exec_ctx->SetParams(common::ManagedPointer<const std::vector<parser::ConstantValueExpression>>(&params));
   //}
-  exec_queries_[query_identifier]->Run(common::ManagedPointer(exec_ctx), execution::vm::ExecutionMode::Compiled);
+  exec_queries_[query_identifier]->Run(common::ManagedPointer(exec_ctx), execution::vm::ExecutionMode::Interpret);
 
   // Update tuple slots.
   auto new_tuple_slot = *exec_ctx->GetTupleSlot();
   auto old_tuple_slot = redo_record->GetTupleSlot();
   tuple_slot_map_[old_tuple_slot] = new_tuple_slot;
-  STORAGE_LOG_ERROR("new_tuple_slot: {}", new_tuple_slot);
 }
 
 void RecoveryManager::DeleteRecordToDeleteTranslator(transaction::TransactionContext *txn,

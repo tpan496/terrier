@@ -452,5 +452,9 @@ class RecoveryManager : public common::DedicatedThreadOwner {
    */
   //std::unordered_map<std::string, std::unique_ptr<planner::OutputSchema>> schemas_;
   std::unordered_map<std::string, std::unique_ptr<execution::compiler::ExecutableQuery>> exec_queries_;
+
+  std::unordered_map<std::string, std::unordered_map<catalog::col_oid_t, type::TypeId>>  all_col_types_;
+  std::unordered_map<std::string, std::unordered_map<catalog::col_oid_t, catalog::Schema::Column>> all_cols_;
+  std::unordered_map<std::string, catalog::Schema> schemas_;
 };
 }  // namespace noisepage::storage
