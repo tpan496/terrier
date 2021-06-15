@@ -1216,22 +1216,23 @@ void RecoveryManager::InsertRedoRecordToInsertTranslator(transaction::Transactio
     ids_to_oids_[query_identifier] = id_to_oid;
   }
 
-  return;
-
   std::vector<common::ManagedPointer<parser::AbstractExpression>> values(redo_record->Delta()->NumColumns());
   std::vector<parser::ConstantValueExpression> params(redo_record->Delta()->NumColumns());
   owned_exprs_.clear();
+  std::unordered_map<catalog::col_oid_t, type::TypeId>& col_types = all_col_types_[query_identifier];
+  std::unordered_map<catalog::col_oid_t, catalog::Schema::Column>& cols = all_cols_[query_identifier];
+  std::unordered_map<col_id_t, catalog::col_oid_t>& id_to_oid = ids_to_oids_[query_identifier];
   for (uint16_t i = 0; i < redo_record->Delta()->NumColumns(); i++) {
     col_id_t col_id = redo_record->Delta()->ColumnIds()[i];
     // We should ingore the version pointer column, this is a hidden storage layer column
     if (col_id != VERSION_POINTER_COLUMN_ID) {
-      catalog::col_oid_t col_oid = ids_to_oids_[query_identifier][col_id];
-      type::TypeId value_type = all_col_types_[query_identifier][col_oid];
+      catalog::col_oid_t col_oid = id_to_oid[col_id];
+      type::TypeId value_type = col_types[col_oid];
       const auto type_id = execution::sql::GetTypeId(value_type);
       byte *raw_bytes = redo_record->Delta()->AccessWithNullCheck(i);
       common::ManagedPointer<parser::AbstractExpression> expr;
       parser::ConstantValueExpression param;
-      auto col = all_cols_[query_identifier][col_oid];
+      auto col = cols[col_oid];
       if (raw_bytes == nullptr) {
         param = parser::ConstantValueExpression();
       } else {
