@@ -1304,6 +1304,8 @@ void RecoveryManager::InsertRedoRecordToInsertTranslator(transaction::Transactio
       params[static_cast<uint32_t>(col_oid)-1] = param;
     }
   }
+
+  return;
   if (!found) {
     // Convert the redo record into a plannode.
     planner::InsertPlanNode::Builder plan_builder;
@@ -1336,7 +1338,7 @@ void RecoveryManager::InsertRedoRecordToInsertTranslator(transaction::Transactio
   //if (found) {
     exec_ctx->SetParams(common::ManagedPointer<const std::vector<parser::ConstantValueExpression>>(&params));
   //}
-  return;
+
   exec_queries_[query_identifier]->Run(common::ManagedPointer(exec_ctx), execution::vm::ExecutionMode::Interpret);
 
   // Update tuple slots.
