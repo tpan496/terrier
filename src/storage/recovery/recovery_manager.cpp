@@ -274,7 +274,7 @@ void RecoveryManager::ReplayRedoRecord(transaction::TransactionContext *txn, Log
       //STORAGE_LOG_ERROR("PG Tables");
     } else {
       InsertRedoRecordToInsertTranslator(txn, sql_table_ptr, redo_record, varlen_contents);
-      //return;
+      return;
     }
 
     // Save the old tuple slot, and reset the tuple slot in the record
