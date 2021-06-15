@@ -1183,15 +1183,15 @@ void RecoveryManager::InsertRedoRecordToInsertTranslator(transaction::Transactio
   exec_settings.UpdateFromSettingsManager(settings_manager_);
   auto out_schema = std::make_unique<planner::OutputSchema>();
   //bool found = false;
-  const std::string query_identifier = "insert_db_" + std::to_string(static_cast<uint32_t>(redo_record->GetDatabaseOid())) + "_tb_" + std::to_string(static_cast<uint32_t>(redo_record->GetTableOid()));
+  const std::string query_identifier = "db_" + std::to_string(static_cast<uint32_t>(redo_record->GetDatabaseOid())) + "_tb_" + std::to_string(static_cast<uint32_t>(redo_record->GetTableOid()));
   bool found = exec_queries_.find(query_identifier) != exec_queries_.end();
 
   // Find col_oids from the catalog.
-  std::unordered_map<catalog::col_oid_t, type::TypeId> col_types;
-  std::unordered_map<catalog::col_oid_t, catalog::Schema::Column> cols;
-  std::unordered_map<col_id_t, catalog::col_oid_t> id_to_oid;
   catalog::Schema schema;
-  if (all_col_types_.find(query_identifier) == all_col_types_.end()) {
+  if (!found) {
+    std::unordered_map<catalog::col_oid_t, type::TypeId> col_types;
+    std::unordered_map<catalog::col_oid_t, catalog::Schema::Column> cols;
+    std::unordered_map<col_id_t, catalog::col_oid_t> id_to_oid;
     auto db_catalog_ptr = GetDatabaseCatalog(txn, redo_record->GetDatabaseOid());
     schema = GetTableSchema(txn, db_catalog_ptr, redo_record->GetTableOid());
     
@@ -1214,11 +1214,6 @@ void RecoveryManager::InsertRedoRecordToInsertTranslator(transaction::Transactio
     all_cols_[query_identifier] = cols;
     schemas_[query_identifier] = schema;
     ids_to_oids_[query_identifier] = id_to_oid;
-  } else {
-    col_types = all_col_types_[query_identifier];
-    cols = all_cols_[query_identifier];
-    schema = schemas_[query_identifier];
-    id_to_oid = ids_to_oids_[query_identifier];
   }
 
   return;
@@ -1230,13 +1225,13 @@ void RecoveryManager::InsertRedoRecordToInsertTranslator(transaction::Transactio
     col_id_t col_id = redo_record->Delta()->ColumnIds()[i];
     // We should ingore the version pointer column, this is a hidden storage layer column
     if (col_id != VERSION_POINTER_COLUMN_ID) {
-      catalog::col_oid_t col_oid = id_to_oid[col_id];
-      type::TypeId value_type = col_types[col_oid];
+      catalog::col_oid_t col_oid = ids_to_oids_[query_identifier][col_id];
+      type::TypeId value_type = all_col_types_[query_identifier][col_oid];
       const auto type_id = execution::sql::GetTypeId(value_type);
       byte *raw_bytes = redo_record->Delta()->AccessWithNullCheck(i);
       common::ManagedPointer<parser::AbstractExpression> expr;
       parser::ConstantValueExpression param;
-      auto col = cols[col_oid];
+      auto col = all_cols_[query_identifier][col_oid];
       if (raw_bytes == nullptr) {
         param = parser::ConstantValueExpression();
       } else {
