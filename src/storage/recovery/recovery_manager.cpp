@@ -38,6 +38,7 @@
 #include "execution/exec/execution_context.h"
 //#include "parser/expression/constant_value_expression.h"
 #include "parser/expression/parameter_value_expression.h"
+#include "execution/vm/llvm_engine.h"
 
 namespace noisepage::storage {
 
@@ -59,6 +60,10 @@ void RecoveryManager::WaitForRecoveryToFinish() {
 
 void RecoveryManager::RecoverFromLogs(const common::ManagedPointer<AbstractLogProvider> log_provider) {
   uint64_t num_records = 0, num_txns = 0;
+  execution::CpuInfo::Instance();
+  const auto bytecode_handlers_path = "bin/bytecode_handlers_ir.bc";
+  auto settings = std::make_unique<const typename execution::vm::LLVMEngine::Settings>(bytecode_handlers_path);
+  execution::vm::LLVMEngine::Initialize(std::move(settings));
 
   // Initialize whether to collect metrics outside of the spin loop so as not to count each loop iteration as a sample
   // (by calling ComponentToRecord this increments the sample count)
@@ -162,6 +167,8 @@ void RecoveryManager::RecoverFromLogs(const common::ManagedPointer<AbstractLogPr
     }
     buffered_changes_map_.clear();
   }
+
+  //execution::vm::LLVMEngine::Shutdown();
 }
 
 uint32_t RecoveryManager::ProcessCommittedTransaction(noisepage::transaction::timestamp_t txn_id) {
@@ -1305,12 +1312,13 @@ void RecoveryManager::InsertRedoRecordToInsertTranslator(transaction::Transactio
   //if (found) {
     exec_ctx->SetParams(common::ManagedPointer<const std::vector<parser::ConstantValueExpression>>(&params));
   //}
-  exec_queries_[query_identifier]->Run(common::ManagedPointer(exec_ctx), execution::vm::ExecutionMode::Interpret);
+  exec_queries_[query_identifier]->Run(common::ManagedPointer(exec_ctx), execution::vm::ExecutionMode::Compiled);
 
   // Update tuple slots.
   auto new_tuple_slot = *exec_ctx->GetTupleSlot();
   auto old_tuple_slot = redo_record->GetTupleSlot();
   tuple_slot_map_[old_tuple_slot] = new_tuple_slot;
+  STORAGE_LOG_ERROR("new_tuple_slot: {}", new_tuple_slot);
 }
 
 void RecoveryManager::DeleteRecordToDeleteTranslator(transaction::TransactionContext *txn,

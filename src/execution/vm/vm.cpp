@@ -2104,6 +2104,7 @@ void VM::Interpret(const uint8_t *ip, Frame *frame) {  // NOLINT
 
     OpStorageInterfaceTableInsert(tuple_slot, storage_interface);
     storage_interface->GetExecutionContext()->SetTupleSlot(*tuple_slot);
+    EXECUTION_LOG_ERROR("tuple_slot: {}", *tuple_slot);
     DISPATCH_NEXT();
   }
 
