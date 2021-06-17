@@ -219,7 +219,11 @@ void OpStorageInterfaceTableUpdate(bool *result, noisepage::execution::sql::Stor
 
 void OpStorageInterfaceTableDelete(bool *result, noisepage::execution::sql::StorageInterface *storage_interface,
                                    noisepage::storage::TupleSlot *tuple_slot) {
-  *result = storage_interface->TableDelete(*tuple_slot);
+  if (*storage_interface->GetExecutionContext()->GetTupleSlot() == noisepage::storage::TupleSlot()) {
+    *result = storage_interface->TableDelete(*tuple_slot);
+  } else {
+    *result = storage_interface->TableDelete(*(storage_interface->GetExecutionContext()->GetTupleSlot()));
+  }
 }
 
 void OpStorageInterfaceTableInsert(noisepage::storage::TupleSlot *tuple_slot,
