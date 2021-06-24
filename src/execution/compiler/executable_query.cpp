@@ -35,6 +35,7 @@ void ExecutableQuery::Fragment::Run(byte query_state[], vm::ExecutionMode mode) 
     return;
   }
   for (const auto &func_name : functions_) {
+    return;
     Function func;
     if (!module_->GetFunction(func_name, mode, &func)) {
       throw EXECUTION_EXCEPTION(fmt::format("Could not find function '{}' in query fragment.", func_name),
@@ -43,7 +44,6 @@ void ExecutableQuery::Fragment::Run(byte query_state[], vm::ExecutionMode mode) 
     try {
       func(query_state);
     } catch (const AbortException &e) {
-      return;
       for (const auto &teardown_name : teardown_fn_) {
         if (!module_->GetFunction(teardown_name, mode, &func)) {
           throw EXECUTION_EXCEPTION(fmt::format("Could not find teardown function '{}' in query fragment.", func_name),
