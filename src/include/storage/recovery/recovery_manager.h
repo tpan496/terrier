@@ -168,7 +168,7 @@ class RecoveryManager : public common::DedicatedThreadOwner {
 
   // TODO(Gus): The recovery manager should be passed a specific block store for table construction. Block store
   // management/assignment is probably a larger system issue that needs to be adddressed. Block store, used to create
-  // tables during recovery
+  // tables during recoveryg
   const common::ManagedPointer<BlockStore> block_store_;
 
   // Settings manager for codegen.
