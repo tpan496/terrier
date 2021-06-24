@@ -42,13 +42,13 @@ void ExecutableQuery::Fragment::Run(byte query_state[], vm::ExecutionMode mode) 
     }
     try {
       func(query_state);
-      return;
     } catch (const AbortException &e) {
       for (const auto &teardown_name : teardown_fn_) {
         if (!module_->GetFunction(teardown_name, mode, &func)) {
           throw EXECUTION_EXCEPTION(fmt::format("Could not find teardown function '{}' in query fragment.", func_name),
                                     common::ErrorCode::ERRCODE_INTERNAL_ERROR);
         }
+        return;
         func(query_state);
       }
       return;
