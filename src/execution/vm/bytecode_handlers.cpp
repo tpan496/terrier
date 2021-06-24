@@ -216,7 +216,11 @@ void OpStorageInterfaceInit(noisepage::execution::sql::StorageInterface *storage
 
 void OpStorageInterfaceGetTablePR(noisepage::storage::ProjectedRow **pr_result,
                                   noisepage::execution::sql::StorageInterface *storage_interface) {
+  auto t1 = high_resolution_clock::now();
   *pr_result = storage_interface->GetTablePR();
+  auto t2 = high_resolution_clock::now();
+  auto ms_int = duration_cast<nanoseconds>(t2 - t1);
+  EXECUTION_LOG_ERROR("OpStorageInterfaceGetTablePR: {}", ms_int.count());
 }
 
 void OpStorageInterfaceTableUpdate(bool *result, noisepage::execution::sql::StorageInterface *storage_interface,
@@ -235,9 +239,12 @@ void OpStorageInterfaceTableDelete(bool *result, noisepage::execution::sql::Stor
 
 void OpStorageInterfaceTableInsert(noisepage::storage::TupleSlot *tuple_slot,
                                    noisepage::execution::sql::StorageInterface *storage_interface) {
-  EXECUTION_LOG_ERROR("insert");
+  auto t1 = high_resolution_clock::now();
   *tuple_slot = storage_interface->TableInsert();
   storage_interface->GetExecutionContext()->SetTupleSlot(*tuple_slot);
+  auto t2 = high_resolution_clock::now();
+  auto ms_int = duration_cast<nanoseconds>(t2 - t1);
+  EXECUTION_LOG_ERROR("OpStorageInterfaceInsert: {}", ms_int.count());
 }
 
 void OpStorageInterfaceGetIndexPR(noisepage::storage::ProjectedRow **pr_result,
@@ -310,7 +317,7 @@ void OpExecutionContextStartPipelineTracker(noisepage::execution::exec::Executio
   exec_ctx->StartPipelineTracker(pipeline_id);
   auto t2 = high_resolution_clock::now();
   auto ms_int = duration_cast<nanoseconds>(t2 - t1);
-  EXECUTION_LOG_ERROR("OpExecOUFeatureVectorInit: {}", ms_int.count());
+  EXECUTION_LOG_ERROR("OpExecutionContextStartPipelineTracker: {}", ms_int.count());
 }
 
 void OpExecutionContextEndPipelineTracker(noisepage::execution::exec::ExecutionContext *const exec_ctx,
@@ -321,7 +328,7 @@ void OpExecutionContextEndPipelineTracker(noisepage::execution::exec::ExecutionC
   exec_ctx->EndPipelineTracker(query_id, pipeline_id, ouvec);
   auto t2 = high_resolution_clock::now();
   auto ms_int = duration_cast<nanoseconds>(t2 - t1);
-  EXECUTION_LOG_ERROR("OpExecOUFeatureVectorInit: {}", ms_int.count());
+  EXECUTION_LOG_ERROR("OpExecutionContextEndPipelineTracker: {}", ms_int.count());
 }
 
 void OpExecOUFeatureVectorRecordFeature(
