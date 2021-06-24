@@ -32,7 +32,7 @@ ExecutableQuery::Fragment::~Fragment() = default;
 using std::chrono::high_resolution_clock;
 using std::chrono::duration_cast;
 using std::chrono::duration;
-using std::chrono::microseconds;
+using std::chrono::nanoseconds;
 
 void ExecutableQuery::Fragment::Run(byte query_state[], vm::ExecutionMode mode) const {
   using Function = std::function<void(void *)>;
@@ -51,7 +51,7 @@ void ExecutableQuery::Fragment::Run(byte query_state[], vm::ExecutionMode mode) 
       auto t1 = high_resolution_clock::now();
       func(query_state);
       auto t2 = high_resolution_clock::now();
-      auto ms_int = duration_cast<microseconds>(t2 - t1);
+      auto ms_int = duration_cast<nanoseconds>(t2 - t1);
       EXECUTION_LOG_ERROR("fn: {}, time: {}", func_name, ms_int.count());
     } catch (const AbortException &e) {
       for (const auto &teardown_name : teardown_fn_) {
