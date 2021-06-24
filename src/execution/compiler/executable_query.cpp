@@ -48,11 +48,11 @@ void ExecutableQuery::Fragment::Run(byte query_state[], vm::ExecutionMode mode) 
                                 common::ErrorCode::ERRCODE_INTERNAL_ERROR);
     }
     try {
-      //auto t1 = high_resolution_clock::now();
+      auto t1 = high_resolution_clock::now();
       func(query_state);
-      //auto t2 = high_resolution_clock::now();
-      //auto ms_int = duration_cast<nanoseconds>(t2 - t1);
-      //EXECUTION_LOG_ERROR("{}: {}", func_name, ms_int.count());
+      auto t2 = high_resolution_clock::now();
+      auto ms_int = duration_cast<nanoseconds>(t2 - t1);
+      EXECUTION_LOG_ERROR("{}: {}", func_name, ms_int.count());
     } catch (const AbortException &e) {
       for (const auto &teardown_name : teardown_fn_) {
         if (!module_->GetFunction(teardown_name, mode, &func)) {
