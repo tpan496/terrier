@@ -271,7 +271,6 @@ void RecoveryManager::ReplayRedoRecord(transaction::TransactionContext *txn, Log
     //STORAGE_LOG_ERROR("Insert Record");
     auto table_oid = redo_record->GetTableOid();
     if (IsSpecialPGTables(table_oid)) {
-      //STORAGE_LOG_ERROR("PG Tables");
     } else {
       InsertRedoRecordToInsertTranslator(txn, sql_table_ptr, redo_record, varlen_contents);
       return;
@@ -296,7 +295,7 @@ void RecoveryManager::ReplayRedoRecord(transaction::TransactionContext *txn, Log
     tuple_slot_map_[old_tuple_slot] = new_tuple_slot;
 
   } else {
-    // STORAGE_LOG_ERROR("Non-Insert Record");
+    // STORAGE_LOG_ERROR("Update Record");
     auto new_tuple_slot = tuple_slot_map_[redo_record->GetTupleSlot()];
     redo_record->SetTupleSlot(new_tuple_slot);
     // Stage the write. This way the recovery operation is logged if logging is enabled
@@ -1209,7 +1208,6 @@ void RecoveryManager::InsertRedoRecordToInsertTranslator(transaction::Transactio
     }
 
     all_col_types_[query_identifier] = col_types;
-    schemas_[query_identifier] = schema;
     ids_to_oids_[query_identifier] = id_to_oid;
   }
 
