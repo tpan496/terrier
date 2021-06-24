@@ -7,6 +7,13 @@
 #include "execution/sql/vector_projection_iterator.h"
 #include "self_driving/modeling/operating_unit_defs.h"
 
+#include <chrono>
+
+using std::chrono::high_resolution_clock;
+using std::chrono::duration_cast;
+using std::chrono::duration;
+using std::chrono::nanoseconds;
+
 extern "C" {
 
 // ---------------------------------------------------------
@@ -299,14 +306,22 @@ void OpExecutionContextInitHooks(noisepage::execution::exec::ExecutionContext *e
 
 void OpExecutionContextStartPipelineTracker(noisepage::execution::exec::ExecutionContext *const exec_ctx,
                                             noisepage::execution::pipeline_id_t pipeline_id) {
+  auto t1 = high_resolution_clock::now();
   exec_ctx->StartPipelineTracker(pipeline_id);
+  auto t2 = high_resolution_clock::now();
+  auto ms_int = duration_cast<nanoseconds>(t2 - t1);
+  EXECUTION_LOG_ERROR("OpExecOUFeatureVectorInit: {}", ms_int.count());
 }
 
 void OpExecutionContextEndPipelineTracker(noisepage::execution::exec::ExecutionContext *const exec_ctx,
                                           noisepage::execution::query_id_t query_id,
                                           noisepage::execution::pipeline_id_t pipeline_id,
                                           noisepage::selfdriving::ExecOUFeatureVector *const ouvec) {
+  auto t1 = high_resolution_clock::now();
   exec_ctx->EndPipelineTracker(query_id, pipeline_id, ouvec);
+  auto t2 = high_resolution_clock::now();
+  auto ms_int = duration_cast<nanoseconds>(t2 - t1);
+  EXECUTION_LOG_ERROR("OpExecOUFeatureVectorInit: {}", ms_int.count());
 }
 
 void OpExecOUFeatureVectorRecordFeature(
@@ -320,13 +335,23 @@ void OpExecOUFeatureVectorRecordFeature(
 void OpExecOUFeatureVectorInitialize(noisepage::execution::exec::ExecutionContext *const exec_ctx,
                                      noisepage::selfdriving::ExecOUFeatureVector *const ouvec,
                                      noisepage::execution::pipeline_id_t pipeline_id, bool is_parallel) {
+  auto t1 = high_resolution_clock::now();
   if (is_parallel)
     exec_ctx->InitializeParallelOUFeatureVector(ouvec, pipeline_id);
   else
     exec_ctx->InitializeOUFeatureVector(ouvec, pipeline_id);
+  auto t2 = high_resolution_clock::now();
+  auto ms_int = duration_cast<nanoseconds>(t2 - t1);
+  EXECUTION_LOG_ERROR("OpExecOUFeatureVectorInit: {}", ms_int.count());
 }
 
-void OpExecOUFeatureVectorReset(noisepage::selfdriving::ExecOUFeatureVector *const ouvec) { ouvec->Reset(); }
+void OpExecOUFeatureVectorReset(noisepage::selfdriving::ExecOUFeatureVector *const ouvec) { 
+  auto t1 = high_resolution_clock::now();
+  ouvec->Reset();
+  auto t2 = high_resolution_clock::now();
+  auto ms_int = duration_cast<nanoseconds>(t2 - t1);
+  EXECUTION_LOG_ERROR("OpExecOUFeatureVectorReset: {}", ms_int.count());
+}
 
 void OpExecutionContextSetMemoryUseOverride(noisepage::execution::exec::ExecutionContext *const exec_ctx,
                                             uint32_t memory_use) {
@@ -345,7 +370,11 @@ void OpExecOUFeatureVectorFilter(noisepage::selfdriving::ExecOUFeatureVector *co
 }
 
 void OpRegisterThreadWithMetricsManager(noisepage::execution::exec::ExecutionContext *exec_ctx) {
+  auto t1 = high_resolution_clock::now();
   exec_ctx->RegisterThreadWithMetricsManager();
+  auto t2 = high_resolution_clock::now();
+  auto ms_int = duration_cast<nanoseconds>(t2 - t1);
+  EXECUTION_LOG_ERROR("OpRegisterThreadWithMetricsManager: {}", ms_int.count());
 }
 
 void OpEnsureTrackersStopped(noisepage::execution::exec::ExecutionContext *exec_ctx) {
