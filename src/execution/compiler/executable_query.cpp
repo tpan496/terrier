@@ -13,6 +13,8 @@
 #include "self_driving/modeling/operating_unit.h"
 #include "transaction/transaction_context.h"
 
+#include <chrono>
+
 namespace noisepage::execution::compiler {
 
 //===----------------------------------------------------------------------===//
@@ -26,6 +28,11 @@ ExecutableQuery::Fragment::Fragment(std::vector<std::string> &&functions, std::v
     : functions_(std::move(functions)), teardown_fn_(std::move(teardown_fn)), module_(std::move(module)) {}
 
 ExecutableQuery::Fragment::~Fragment() = default;
+
+using std::chrono::high_resolution_clock;
+using std::chrono::duration_cast;
+using std::chrono::duration;
+using std::chrono::milliseconds;
 
 void ExecutableQuery::Fragment::Run(byte query_state[], vm::ExecutionMode mode) const {
   using Function = std::function<void(void *)>;
@@ -41,12 +48,11 @@ void ExecutableQuery::Fragment::Run(byte query_state[], vm::ExecutionMode mode) 
                                 common::ErrorCode::ERRCODE_INTERNAL_ERROR);
     }
     try {
-      if (func_name == "Query0_Pipeline1_Run") {
-        func(query_state);
-      } else {
-        continue;
-      }
-      
+      auto t1 = high_resolution_clock::now();
+      func(query_state);
+      auto t2 = high_resolution_clock::now();
+      auto ms_int = duration_cast<milliseconds>(t2 - t1);
+      EXECUTION_LOG_ERROR("fn: {}, time: {}", func_name, ms_int);
     } catch (const AbortException &e) {
       for (const auto &teardown_name : teardown_fn_) {
         if (!module_->GetFunction(teardown_name, mode, &func)) {
