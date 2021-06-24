@@ -216,11 +216,11 @@ void OpStorageInterfaceInit(noisepage::execution::sql::StorageInterface *storage
 
 void OpStorageInterfaceGetTablePR(noisepage::storage::ProjectedRow **pr_result,
                                   noisepage::execution::sql::StorageInterface *storage_interface) {
-  //auto t1 = high_resolution_clock::now();
+  auto t1 = high_resolution_clock::now();
   *pr_result = storage_interface->GetTablePR();
-  //auto t2 = high_resolution_clock::now();
-  //auto ms_int = duration_cast<nanoseconds>(t2 - t1);
-  //EXECUTION_LOG_ERROR("OpStorageInterfaceGetTablePR: {}", ms_int.count());
+  auto t2 = high_resolution_clock::now();
+  auto ms_int = duration_cast<nanoseconds>(t2 - t1);
+  EXECUTION_LOG_ERROR("OpStorageInterfaceGetTablePR: {}", ms_int.count());
 }
 
 void OpStorageInterfaceTableUpdate(bool *result, noisepage::execution::sql::StorageInterface *storage_interface,
@@ -239,12 +239,12 @@ void OpStorageInterfaceTableDelete(bool *result, noisepage::execution::sql::Stor
 
 void OpStorageInterfaceTableInsert(noisepage::storage::TupleSlot *tuple_slot,
                                    noisepage::execution::sql::StorageInterface *storage_interface) {
-  //auto t1 = high_resolution_clock::now();
+  auto t1 = high_resolution_clock::now();
   *tuple_slot = storage_interface->TableInsert();
   storage_interface->GetExecutionContext()->SetTupleSlot(*tuple_slot);
-  //auto t2 = high_resolution_clock::now();
-  //auto ms_int = duration_cast<nanoseconds>(t2 - t1);
-  //EXECUTION_LOG_ERROR("OpStorageInterfaceInsert: {}", ms_int.count());
+  auto t2 = high_resolution_clock::now();
+  auto ms_int = duration_cast<nanoseconds>(t2 - t1);
+  EXECUTION_LOG_ERROR("OpStorageInterfaceInsert: {}", ms_int.count());
 }
 
 void OpStorageInterfaceGetIndexPR(noisepage::storage::ProjectedRow **pr_result,
@@ -313,22 +313,22 @@ void OpExecutionContextInitHooks(noisepage::execution::exec::ExecutionContext *e
 
 void OpExecutionContextStartPipelineTracker(noisepage::execution::exec::ExecutionContext *const exec_ctx,
                                             noisepage::execution::pipeline_id_t pipeline_id) {
-  //auto t1 = high_resolution_clock::now();
+  auto t1 = high_resolution_clock::now();
   exec_ctx->StartPipelineTracker(pipeline_id);
-  //auto t2 = high_resolution_clock::now();
-  //auto ms_int = duration_cast<nanoseconds>(t2 - t1);
-  //EXECUTION_LOG_ERROR("OpExecutionContextStartPipelineTracker: {}", ms_int.count());
+  auto t2 = high_resolution_clock::now();
+  auto ms_int = duration_cast<nanoseconds>(t2 - t1);
+  EXECUTION_LOG_ERROR("OpExecutionContextStartPipelineTracker: {}", ms_int.count());
 }
 
 void OpExecutionContextEndPipelineTracker(noisepage::execution::exec::ExecutionContext *const exec_ctx,
                                           noisepage::execution::query_id_t query_id,
                                           noisepage::execution::pipeline_id_t pipeline_id,
                                           noisepage::selfdriving::ExecOUFeatureVector *const ouvec) {
-  //auto t1 = high_resolution_clock::now();
+  auto t1 = high_resolution_clock::now();
   exec_ctx->EndPipelineTracker(query_id, pipeline_id, ouvec);
-  //auto t2 = high_resolution_clock::now();
-  //auto ms_int = duration_cast<nanoseconds>(t2 - t1);
-  //EXECUTION_LOG_ERROR("OpExecutionContextEndPipelineTracker: {}", ms_int.count());
+  auto t2 = high_resolution_clock::now();
+  auto ms_int = duration_cast<nanoseconds>(t2 - t1);
+  EXECUTION_LOG_ERROR("OpExecutionContextEndPipelineTracker: {}", ms_int.count());
 }
 
 void OpExecOUFeatureVectorRecordFeature(
@@ -342,22 +342,22 @@ void OpExecOUFeatureVectorRecordFeature(
 void OpExecOUFeatureVectorInitialize(noisepage::execution::exec::ExecutionContext *const exec_ctx,
                                      noisepage::selfdriving::ExecOUFeatureVector *const ouvec,
                                      noisepage::execution::pipeline_id_t pipeline_id, bool is_parallel) {
-  //auto t1 = high_resolution_clock::now();
+  auto t1 = high_resolution_clock::now();
   if (is_parallel)
     exec_ctx->InitializeParallelOUFeatureVector(ouvec, pipeline_id);
   else
     exec_ctx->InitializeOUFeatureVector(ouvec, pipeline_id);
-  //auto t2 = high_resolution_clock::now();
-  //auto ms_int = duration_cast<nanoseconds>(t2 - t1);
-  //EXECUTION_LOG_ERROR("OpExecOUFeatureVectorInit: {}", ms_int.count());
+  auto t2 = high_resolution_clock::now();
+  auto ms_int = duration_cast<nanoseconds>(t2 - t1);
+  EXECUTION_LOG_ERROR("OpExecOUFeatureVectorInit: {}", ms_int.count());
 }
 
 void OpExecOUFeatureVectorReset(noisepage::selfdriving::ExecOUFeatureVector *const ouvec) { 
-  //auto t1 = high_resolution_clock::now();
+  auto t1 = high_resolution_clock::now();
   ouvec->Reset();
-  //auto t2 = high_resolution_clock::now();
-  //auto ms_int = duration_cast<nanoseconds>(t2 - t1);
-  //EXECUTION_LOG_ERROR("OpExecOUFeatureVectorReset: {}", ms_int.count());
+  auto t2 = high_resolution_clock::now();
+  auto ms_int = duration_cast<nanoseconds>(t2 - t1);
+  EXECUTION_LOG_ERROR("OpExecOUFeatureVectorReset: {}", ms_int.count());
 }
 
 void OpExecutionContextSetMemoryUseOverride(noisepage::execution::exec::ExecutionContext *const exec_ctx,
@@ -377,11 +377,11 @@ void OpExecOUFeatureVectorFilter(noisepage::selfdriving::ExecOUFeatureVector *co
 }
 
 void OpRegisterThreadWithMetricsManager(noisepage::execution::exec::ExecutionContext *exec_ctx) {
-  //auto t1 = high_resolution_clock::now();
+  auto t1 = high_resolution_clock::now();
   exec_ctx->RegisterThreadWithMetricsManager();
-  //auto t2 = high_resolution_clock::now();
-  //auto ms_int = duration_cast<nanoseconds>(t2 - t1);
-  //EXECUTION_LOG_ERROR("OpRegisterThreadWithMetricsManager: {}", ms_int.count());
+  auto t2 = high_resolution_clock::now();
+  auto ms_int = duration_cast<nanoseconds>(t2 - t1);
+  EXECUTION_LOG_ERROR("OpRegisterThreadWithMetricsManager: {}", ms_int.count());
 }
 
 void OpEnsureTrackersStopped(noisepage::execution::exec::ExecutionContext *exec_ctx) {
