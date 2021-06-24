@@ -42,7 +42,7 @@ void ExecutableQuery::Fragment::Run(byte query_state[], vm::ExecutionMode mode) 
     }
     try {
       func(query_state);
-      continue;
+      EXECUTION_LOG_ERROR("fn: {}", func_name);
     } catch (const AbortException &e) {
       for (const auto &teardown_name : teardown_fn_) {
         if (!module_->GetFunction(teardown_name, mode, &func)) {
