@@ -121,7 +121,7 @@ void Compiler::Run(Compiler::Callbacks *callbacks) {
   // -------------------------------------------------------
 
   callbacks->TakeOwnership(std::move(module));
-  ast::AstPrettyPrint::Dump(std::cout, root_);
+  //ast::AstPrettyPrint::Dump(std::cout, root_);
 }
 
 void Compiler::RunCompilation(const Compiler::Input &input, Compiler::Callbacks *callbacks) {

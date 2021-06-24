@@ -41,8 +41,12 @@ void ExecutableQuery::Fragment::Run(byte query_state[], vm::ExecutionMode mode) 
                                 common::ErrorCode::ERRCODE_INTERNAL_ERROR);
     }
     try {
-      func(query_state);
-      EXECUTION_LOG_ERROR("fn: {}", func_name);
+      if (func_name == "Query0_Pipeline1_Run") {
+        func(query_state);
+      } else {
+        continue;
+      }
+      
     } catch (const AbortException &e) {
       for (const auto &teardown_name : teardown_fn_) {
         if (!module_->GetFunction(teardown_name, mode, &func)) {
