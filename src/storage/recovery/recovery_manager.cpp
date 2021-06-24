@@ -1328,7 +1328,7 @@ void RecoveryManager::InsertRedoRecordToInsertTranslator(transaction::Transactio
     exec_ctx->SetParams(common::ManagedPointer<const std::vector<parser::ConstantValueExpression>>(&params));
   //}
 
-  exec_queries_[query_identifier]->Run(common::ManagedPointer(exec_ctx), execution::vm::ExecutionMode::Compiled);
+  exec_queries_[query_identifier]->Run(common::ManagedPointer(exec_ctx), execution::vm::ExecutionMode::Interpret);
 
   // Update tuple slots.
   auto new_tuple_slot = *exec_ctx->GetTupleSlot();
