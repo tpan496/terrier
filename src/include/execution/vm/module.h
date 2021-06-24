@@ -237,7 +237,7 @@ inline bool Module::GetFunction(const std::string &name, const ExecutionMode exe
       break;
     }
     case ExecutionMode::Compiled: {
-      return;
+      return true;
       CompileToMachineCode();
       *func = [this, func_info](ArgTypes... args) -> Ret {
         void *raw_func = functions_[func_info->GetId()].load(std::memory_order_relaxed);
