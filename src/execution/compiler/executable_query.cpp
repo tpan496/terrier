@@ -40,6 +40,7 @@ void ExecutableQuery::Fragment::Run(byte query_state[], vm::ExecutionMode mode) 
       throw EXECUTION_EXCEPTION(fmt::format("Could not find function '{}' in query fragment.", func_name),
                                 common::ErrorCode::ERRCODE_INTERNAL_ERROR);
     }
+    continue;
     try {
       func(query_state);
     } catch (const AbortException &e) {
@@ -48,7 +49,6 @@ void ExecutableQuery::Fragment::Run(byte query_state[], vm::ExecutionMode mode) 
           throw EXECUTION_EXCEPTION(fmt::format("Could not find teardown function '{}' in query fragment.", func_name),
                                     common::ErrorCode::ERRCODE_INTERNAL_ERROR);
         }
-        return;
         func(query_state);
       }
       return;
