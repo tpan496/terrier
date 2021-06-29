@@ -217,6 +217,7 @@ void OpStorageInterfaceInit(noisepage::execution::sql::StorageInterface *storage
 void OpStorageInterfaceGetTablePR(noisepage::storage::ProjectedRow **pr_result,
                                   noisepage::execution::sql::StorageInterface *storage_interface) {
   //auto t1 = high_resolution_clock::now();
+  return;
   *pr_result = storage_interface->GetTablePR();
   //auto t2 = high_resolution_clock::now();
   //auto ms_int = duration_cast<nanoseconds>(t2 - t1);
