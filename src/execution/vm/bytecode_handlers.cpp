@@ -314,6 +314,7 @@ void OpExecutionContextInitHooks(noisepage::execution::exec::ExecutionContext *e
 void OpExecutionContextStartPipelineTracker(noisepage::execution::exec::ExecutionContext *const exec_ctx,
                                             noisepage::execution::pipeline_id_t pipeline_id) {
   //auto t1 = high_resolution_clock::now();
+  return;
   exec_ctx->StartPipelineTracker(pipeline_id);
   //auto t2 = high_resolution_clock::now();
   //auto ms_int = duration_cast<nanoseconds>(t2 - t1);
@@ -325,6 +326,7 @@ void OpExecutionContextEndPipelineTracker(noisepage::execution::exec::ExecutionC
                                           noisepage::execution::pipeline_id_t pipeline_id,
                                           noisepage::selfdriving::ExecOUFeatureVector *const ouvec) {
   //auto t1 = high_resolution_clock::now();
+  return;
   exec_ctx->EndPipelineTracker(query_id, pipeline_id, ouvec);
   //auto t2 = high_resolution_clock::now();
   //auto ms_int = duration_cast<nanoseconds>(t2 - t1);
@@ -355,6 +357,7 @@ void OpExecOUFeatureVectorInitialize(noisepage::execution::exec::ExecutionContex
 
 void OpExecOUFeatureVectorReset(noisepage::selfdriving::ExecOUFeatureVector *const ouvec) { 
   //auto t1 = high_resolution_clock::now();
+  return;
   ouvec->Reset();
   //auto t2 = high_resolution_clock::now();
   //auto ms_int = duration_cast<nanoseconds>(t2 - t1);
@@ -379,6 +382,7 @@ void OpExecOUFeatureVectorFilter(noisepage::selfdriving::ExecOUFeatureVector *co
 
 void OpRegisterThreadWithMetricsManager(noisepage::execution::exec::ExecutionContext *exec_ctx) {
   //auto t1 = high_resolution_clock::now();
+  return;
   exec_ctx->RegisterThreadWithMetricsManager();
   //auto t2 = high_resolution_clock::now();
   //auto ms_int = duration_cast<nanoseconds>(t2 - t1);
