@@ -13,6 +13,8 @@
 #include "self_driving/modeling/operating_unit.h"
 #include "transaction/transaction_context.h"
 
+#include <chrono>
+
 namespace noisepage::execution::compiler {
 
 //===----------------------------------------------------------------------===//
@@ -26,6 +28,11 @@ ExecutableQuery::Fragment::Fragment(std::vector<std::string> &&functions, std::v
     : functions_(std::move(functions)), teardown_fn_(std::move(teardown_fn)), module_(std::move(module)) {}
 
 ExecutableQuery::Fragment::~Fragment() = default;
+
+using std::chrono::high_resolution_clock;
+using std::chrono::duration_cast;
+using std::chrono::duration;
+using std::chrono::nanoseconds;
 
 void ExecutableQuery::Fragment::Run(byte query_state[], vm::ExecutionMode mode) const {
   using Function = std::function<void(void *)>;
