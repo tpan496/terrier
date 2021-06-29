@@ -94,6 +94,7 @@ ast::Identifier Pipeline::GetWorkFunctionName() const {
 }
 
 void Pipeline::InjectStartResourceTracker(FunctionBuilder *builder, bool is_hook) const {
+  return;
   if (compilation_context_->IsPipelineMetricsEnabled()) {
     auto *exec_ctx = compilation_context_->GetExecutionContextPtrFromQueryState();
 
@@ -115,6 +116,7 @@ void Pipeline::InjectStartResourceTracker(FunctionBuilder *builder, bool is_hook
 }
 
 void Pipeline::InjectEndResourceTracker(FunctionBuilder *builder, bool is_hook) const {
+  return;
   if (compilation_context_->IsPipelineMetricsEnabled()) {
     auto *exec_ctx = compilation_context_->GetExecutionContextPtrFromQueryState();
 
