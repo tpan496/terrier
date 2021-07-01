@@ -134,6 +134,11 @@ class UpdateTranslator : public OperatorTranslator, public PipelineDriver {
   // This maps column oids to offsets in a projected row.
   storage::ProjectionMap table_pm_;
 
+  // Codegen Replication only.
+  // Sets the tuple slot to delete.
+    // thread local tuple slot
+  StateDescriptor::Entry tuple_slot_;
+
   // The number of updates that are performed.
   StateDescriptor::Entry num_updates_;
 };
