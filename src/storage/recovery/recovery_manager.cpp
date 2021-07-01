@@ -1418,7 +1418,7 @@ void RecoveryManager::UpdateRecordToUpdateTranslator(transaction::TransactionCon
   plan_builder.SetOutputSchema(std::make_unique<planner::OutputSchema>());
   
   std::unique_ptr<planner::UpdatePlanNode> out_plan = plan_builder.Build();
-  out_plan->SetUseTupleSlot(true);
+  //out_plan->SetUseTupleSlot(true);
 
   // Compile the plannode.
   auto exec_query = execution::compiler::CompilationContext::Compile(*out_plan, exec_settings, accessor.get(),
@@ -1426,7 +1426,7 @@ void RecoveryManager::UpdateRecordToUpdateTranslator(transaction::TransactionCon
 
   execution::exec::OutputCallback callback = InsertCallback;
   auto exec_ctx = std::make_unique<execution::exec::ExecutionContext>(
-      delete_record->GetDatabaseOid(), common::ManagedPointer<transaction::TransactionContext>(txn), callback,
+      redo_record->GetDatabaseOid(), common::ManagedPointer<transaction::TransactionContext>(txn), callback,
                                         out_plan->GetOutputSchema().Get(), common::ManagedPointer<catalog::CatalogAccessor>(accessor), exec_settings, DISABLED, DISABLED, DISABLED);
   exec_ctx->SetTupleSlot(new_tuple_slot);
   exec_query->Run(common::ManagedPointer(exec_ctx), execution::vm::ExecutionMode::Interpret);
