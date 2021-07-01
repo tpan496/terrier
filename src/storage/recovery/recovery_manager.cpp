@@ -296,8 +296,8 @@ void RecoveryManager::ReplayRedoRecord(transaction::TransactionContext *txn, Log
     tuple_slot_map_[old_tuple_slot] = new_tuple_slot;
 
   } else {
-    //UpdateRecordToUpdateTranslator(txn, sql_table_ptr, redo_record);
-    //return;
+    UpdateRecordToUpdateTranslator(txn, sql_table_ptr, redo_record);
+    return;
 
     // STORAGE_LOG_ERROR("Update Record");
     auto new_tuple_slot = tuple_slot_map_[redo_record->GetTupleSlot()];
@@ -1354,7 +1354,6 @@ void RecoveryManager::DeleteRecordToDeleteTranslator(transaction::TransactionCon
   planner::TupleDeletePlanNode::Builder plan_builder;
   plan_builder.SetDatabaseOid(delete_record->GetDatabaseOid());
   plan_builder.SetTableOid(delete_record->GetTableOid());
-  //plan_builder.SetTupleSlot(new_tuple_slot);
 
   // Stores index objects.
   //std::vector<catalog::index_oid_t> index_oids = accessor->GetIndexOids(delete_record->GetTableOid());

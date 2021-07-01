@@ -30,6 +30,8 @@ UpdateTranslator::UpdateTranslator(const planner::UpdatePlanNode &plan, Compilat
     tuple_slot_ = pipeline->DeclarePipelineStateEntry("tuple_slot", tuple_slot_type);
   }
 
+  EXECUTION_LOG_ERROR("ok");
+
   for (const auto &clause : plan.GetSetClauses()) {
     compilation_context->Prepare(*clause.second);
   }
