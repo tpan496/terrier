@@ -98,7 +98,7 @@ class TupleUpdatePlanNode : public UpdatePlanNode {
      * @return plan node
      */
     std::unique_ptr<TupleUpdatePlanNode> Build() {
-      return std::unique_ptr<UpdatePlanNode>(new UpdatePlanNode(
+      return std::unique_ptr<TupleUpdatePlanNode>(new TupleUpdatePlanNode(
           std::move(children_), std::make_unique<OutputSchema>(), database_oid_, table_oid_, update_primary_key_,
           indexed_update_, std::move(sets_), std::move(index_oids_), plan_node_id_));
     }
@@ -249,6 +249,6 @@ class TupleUpdatePlanNode : public UpdatePlanNode {
   std::vector<catalog::index_oid_t> index_oids_;
 };
 
-DEFINE_JSON_HEADER_DECLARATIONS(UpdatePlanNode);
+DEFINE_JSON_HEADER_DECLARATIONS(TupleUpdatePlanNode);
 
 }  // namespace noisepage::planner
