@@ -1415,7 +1415,7 @@ void RecoveryManager::UpdateRecordToUpdateTranslator(transaction::TransactionCon
 
   plan_builder.SetOutputSchema(std::make_unique<planner::OutputSchema>());
   
-  std::unique_ptr<planner::UpdatePlanNode> out_plan = plan_builder.Build();
+  std::unique_ptr<planner::TupleUpdatePlanNode> out_plan = plan_builder.Build();
 
   // Compile the plannode.
   auto exec_query = execution::compiler::CompilationContext::Compile(*out_plan, exec_settings, accessor.get(),
