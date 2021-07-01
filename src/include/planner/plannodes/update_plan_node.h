@@ -13,8 +13,6 @@
 
 namespace noisepage::planner {
 
-class TupleUpdatePlanNode;
-
 /**
  * Describes a single SET clause of an UPDATE query.
  * For UPDATE tbl SET [$1] = $2:
@@ -137,6 +135,9 @@ class UpdatePlanNode : public AbstractPlanNode {
   };
 
  private:
+  
+
+ public:
   /**
    * @param children child plan nodes
    * @param output_schema Schema representing the structure of the output of this plan node
@@ -160,10 +161,6 @@ class UpdatePlanNode : public AbstractPlanNode {
         indexed_update_(indexed_update),
         sets_(std::move(sets)),
         index_oids_(std::move(index_oids)) {}
-  
-  friend class TupleUpdatePlanNode;
-
- public:
   /**
    * Default constructor for deserialization
    */
