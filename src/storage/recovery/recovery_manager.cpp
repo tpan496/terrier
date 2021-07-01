@@ -1403,7 +1403,7 @@ void RecoveryManager::UpdateRecordToUpdateTranslator(transaction::TransactionCon
                                                          common::ManagedPointer<storage::SqlTable> sql_table,
                                                          storage::RedoRecord *redo_record) {
   std::unique_ptr<catalog::CatalogAccessor> accessor =
-      catalog_->GetAccessor(common::ManagedPointer(txn), delete_record->GetDatabaseOid(), DISABLED);
+      catalog_->GetAccessor(common::ManagedPointer(txn), redo_record->GetDatabaseOid(), DISABLED);
   
   execution::exec::ExecutionSettings exec_settings{};
   exec_settings.UpdateFromSettingsManager(settings_manager_);
@@ -1412,12 +1412,8 @@ void RecoveryManager::UpdateRecordToUpdateTranslator(transaction::TransactionCon
 
   // Convert the redo record into a plannode.
   planner::UpdatePlanNode::Builder plan_builder;
-  plan_builder.SetDatabaseOid(delete_record->GetDatabaseOid());
-  plan_builder.SetTableOid(delete_record->GetTableOid());
-
-  // Stores index objects.
-  //std::vector<catalog::index_oid_t> index_oids = accessor->GetIndexOids(delete_record->GetTableOid());
-  //plan_builder.SetIndexOids(std::move(index_oids));
+  plan_builder.SetDatabaseOid(redo_record->GetDatabaseOid());
+  plan_builder.SetTableOid(redo_record->GetTableOid());
 
   plan_builder.SetOutputSchema(std::make_unique<planner::OutputSchema>());
   
