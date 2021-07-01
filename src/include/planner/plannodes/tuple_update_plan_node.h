@@ -10,6 +10,7 @@
 #include "planner/plannodes/abstract_plan_node.h"
 #include "planner/plannodes/output_schema.h"
 #include "planner/plannodes/plan_visitor.h"
+#include "planner/plannodes/update_plan_node.h"
 
 namespace noisepage::planner {
 
@@ -24,7 +25,7 @@ using SetClause = std::pair<catalog::col_oid_t, common::ManagedPointer<parser::A
 /**
  * Plan node for update
  */
-class UpdatePlanNode : public AbstractPlanNode {
+class TupleUpdatePlanNode : public UpdatePlanNode {
  public:
   /**
    * Builder for an delete plan node
@@ -202,8 +203,6 @@ class UpdatePlanNode : public AbstractPlanNode {
    */
   const std::vector<catalog::index_oid_t> &GetIndexOids() const { return index_oids_; }
 
-  bool UseTupleSlot() const { return use_tuple_slot_; }
-
   /**
    * @return the hashed value of this plan node
    */
@@ -215,6 +214,8 @@ class UpdatePlanNode : public AbstractPlanNode {
 
   nlohmann::json ToJson() const override;
   std::vector<std::unique_ptr<parser::AbstractExpression>> FromJson(const nlohmann::json &j) override;
+
+  bool UseTupleSlot() const { return true; }
 
  private:
   /**
@@ -246,8 +247,6 @@ class UpdatePlanNode : public AbstractPlanNode {
    * Vector of indexes to update
    */
   std::vector<catalog::index_oid_t> index_oids_;
-
-  bool use_tuple_slot_ = false;
 };
 
 DEFINE_JSON_HEADER_DECLARATIONS(UpdatePlanNode);
