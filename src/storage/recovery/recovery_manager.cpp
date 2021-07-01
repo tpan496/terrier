@@ -272,8 +272,8 @@ void RecoveryManager::ReplayRedoRecord(transaction::TransactionContext *txn, Log
     auto table_oid = redo_record->GetTableOid();
     if (IsSpecialPGTables(table_oid)) {
     } else {
-      //InsertRedoRecordToInsertTranslator(txn, sql_table_ptr, redo_record, varlen_contents);
-      //return;
+      InsertRedoRecordToInsertTranslator(txn, sql_table_ptr, redo_record, varlen_contents);
+      return;
     }
 
     // Save the old tuple slot, and reset the tuple slot in the record
@@ -295,6 +295,11 @@ void RecoveryManager::ReplayRedoRecord(transaction::TransactionContext *txn, Log
     tuple_slot_map_[old_tuple_slot] = new_tuple_slot;
 
   } else {
+    if (IsSpecialPGTables(table_oid)) {
+    } else {
+      UpdateRecordToUpdateTranslator(txn, sql_table_ptr, redo_record);
+      return;
+    }
     // STORAGE_LOG_ERROR("Update Record");
     auto new_tuple_slot = tuple_slot_map_[redo_record->GetTupleSlot()];
     redo_record->SetTupleSlot(new_tuple_slot);
@@ -1392,6 +1397,45 @@ void RecoveryManager::DeleteRecordToDeleteTranslator(transaction::TransactionCon
   delete[] buffer;
   
   tuple_slot_map_.erase(new_tuple_slot);
+}
+
+void RecoveryManager::UpdateRecordToUpdateTranslator(transaction::TransactionContext *txn,
+                                                         common::ManagedPointer<storage::SqlTable> sql_table,
+                                                         storage::RedoRecord *redo_record) {
+  std::unique_ptr<catalog::CatalogAccessor> accessor =
+      catalog_->GetAccessor(common::ManagedPointer(txn), delete_record->GetDatabaseOid(), DISABLED);
+  
+  execution::exec::ExecutionSettings exec_settings{};
+  exec_settings.UpdateFromSettingsManager(settings_manager_);
+
+  auto new_tuple_slot = tuple_slot_map_[redo_record->GetTupleSlot()];
+
+  // Convert the redo record into a plannode.
+  planner::UpdatePlanNode::Builder plan_builder;
+  plan_builder.SetDatabaseOid(delete_record->GetDatabaseOid());
+  plan_builder.SetTableOid(delete_record->GetTableOid());
+
+  // Stores index objects.
+  //std::vector<catalog::index_oid_t> index_oids = accessor->GetIndexOids(delete_record->GetTableOid());
+  //plan_builder.SetIndexOids(std::move(index_oids));
+
+  plan_builder.SetOutputSchema(std::make_unique<planner::OutputSchema>());
+  
+  std::unique_ptr<planner::UpdatePlanNode> out_plan = plan_builder.Build();
+  out_plan->SetUseTupleSlot(true);
+
+  // Compile the plannode.
+  auto exec_query = execution::compiler::CompilationContext::Compile(*out_plan, exec_settings, accessor.get(),
+                                                                     execution::compiler::CompilationMode::OneShot);
+
+  execution::exec::OutputCallback callback = InsertCallback;
+  auto exec_ctx = std::make_unique<execution::exec::ExecutionContext>(
+      delete_record->GetDatabaseOid(), common::ManagedPointer<transaction::TransactionContext>(txn), callback,
+                                        out_plan->GetOutputSchema().Get(), common::ManagedPointer<catalog::CatalogAccessor>(accessor), exec_settings, DISABLED, DISABLED, DISABLED);
+  exec_ctx->SetTupleSlot(new_tuple_slot);
+  exec_query->Run(common::ManagedPointer(exec_ctx), execution::vm::ExecutionMode::Interpret);
+
+
 }
 
 }  // namespace noisepage::storage

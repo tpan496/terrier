@@ -445,6 +445,10 @@ class RecoveryManager : public common::DedicatedThreadOwner {
                                           common::ManagedPointer<storage::SqlTable> sql_table,
                                           storage::DeleteRecord *delete_record,
                                           storage::TupleSlot new_tuple_slot);
+  
+  void UpdateRecordToUpdateTranslator(transaction::TransactionContext *txn,
+                                          common::ManagedPointer<storage::SqlTable> sql_table,
+                                          storage::RedoRecord *redo_record);
 
   /**
    * Information about cached executable queries

@@ -225,7 +225,11 @@ void OpStorageInterfaceGetTablePR(noisepage::storage::ProjectedRow **pr_result,
 
 void OpStorageInterfaceTableUpdate(bool *result, noisepage::execution::sql::StorageInterface *storage_interface,
                                    noisepage::storage::TupleSlot *tuple_slot) {
-  *result = storage_interface->TableUpdate(*tuple_slot);
+  if (*storage_interface->GetExecutionContext()->GetTupleSlot() == noisepage::storage::TupleSlot()) {
+    *result = storage_interface->TableUpdate(*tuple_slot);
+  } else {
+    *result = storage_interface->TableUpdate(*(storage_interface->GetExecutionContext()->GetTupleSlot()));
+  }
 }
 
 void OpStorageInterfaceTableDelete(bool *result, noisepage::execution::sql::StorageInterface *storage_interface,
