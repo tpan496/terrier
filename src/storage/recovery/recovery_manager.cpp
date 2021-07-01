@@ -296,8 +296,8 @@ void RecoveryManager::ReplayRedoRecord(transaction::TransactionContext *txn, Log
     tuple_slot_map_[old_tuple_slot] = new_tuple_slot;
 
   } else {
-    UpdateRecordToUpdateTranslator(txn, sql_table_ptr, redo_record);
-    return;
+    //UpdateRecordToUpdateTranslator(txn, sql_table_ptr, redo_record);
+    //return;
 
     // STORAGE_LOG_ERROR("Update Record");
     auto new_tuple_slot = tuple_slot_map_[redo_record->GetTupleSlot()];

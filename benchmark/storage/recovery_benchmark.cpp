@@ -20,7 +20,7 @@ class RecoveryBenchmark : public benchmark::Fixture {
 
   const uint32_t initial_table_size_ = 1000000;
   const uint32_t num_txns_ = 100000;
-  const uint32_t num_indexes_ = 5;
+  const uint32_t num_indexes_ = 50;
   std::default_random_engine generator_;
 
   /**
