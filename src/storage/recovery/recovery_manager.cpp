@@ -1410,7 +1410,7 @@ void RecoveryManager::UpdateRecordToUpdateTranslator(transaction::TransactionCon
   auto new_tuple_slot = tuple_slot_map_[redo_record->GetTupleSlot()];
 
   // Convert the redo record into a plannode.
-  planner::UpdatePlanNode::Builder plan_builder;
+  planner::TupleUpdatePlanNode::Builder plan_builder;
   plan_builder.SetDatabaseOid(redo_record->GetDatabaseOid());
   plan_builder.SetTableOid(redo_record->GetTableOid());
 
