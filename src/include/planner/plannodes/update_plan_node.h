@@ -13,6 +13,8 @@
 
 namespace noisepage::planner {
 
+class TupleUpdatePlanNode;
+
 /**
  * Describes a single SET clause of an UPDATE query.
  * For UPDATE tbl SET [$1] = $2:
