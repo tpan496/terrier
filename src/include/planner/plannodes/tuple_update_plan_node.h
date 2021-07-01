@@ -97,7 +97,7 @@ class TupleUpdatePlanNode : public UpdatePlanNode {
      * Build the delete plan node
      * @return plan node
      */
-    std::unique_ptr<UpdatePlanNode> Build() {
+    std::unique_ptr<TupleUpdatePlanNode> Build() {
       return std::unique_ptr<UpdatePlanNode>(new UpdatePlanNode(
           std::move(children_), std::make_unique<OutputSchema>(), database_oid_, table_oid_, update_primary_key_,
           indexed_update_, std::move(sets_), std::move(index_oids_), plan_node_id_));
@@ -148,7 +148,7 @@ class TupleUpdatePlanNode : public UpdatePlanNode {
    * @param index_oids Indexes to update
    * @param plan_node_id Plan node id
    */
-  UpdatePlanNode(std::vector<std::unique_ptr<AbstractPlanNode>> &&children, std::unique_ptr<OutputSchema> output_schema,
+  TupleUpdatePlanNode(std::vector<std::unique_ptr<AbstractPlanNode>> &&children, std::unique_ptr<OutputSchema> output_schema,
                  catalog::db_oid_t database_oid, catalog::table_oid_t table_oid, bool update_primary_key,
                  bool indexed_update, std::vector<SetClause> sets, std::vector<catalog::index_oid_t> &&index_oids,
                  plan_node_id_t plan_node_id)
@@ -164,9 +164,9 @@ class TupleUpdatePlanNode : public UpdatePlanNode {
   /**
    * Default constructor for deserialization
    */
-  UpdatePlanNode() = default;
+  TupleUpdatePlanNode() = default;
 
-  DISALLOW_COPY_AND_MOVE(UpdatePlanNode)
+  DISALLOW_COPY_AND_MOVE(TupleUpdatePlanNode)
 
   /**
    * @return OID of the database
