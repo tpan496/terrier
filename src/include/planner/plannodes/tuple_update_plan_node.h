@@ -152,7 +152,7 @@ class TupleUpdatePlanNode : public UpdatePlanNode {
                  catalog::db_oid_t database_oid, catalog::table_oid_t table_oid, bool update_primary_key,
                  bool indexed_update, std::vector<SetClause> sets, std::vector<catalog::index_oid_t> &&index_oids,
                  plan_node_id_t plan_node_id)
-      : AbstractPlanNode(std::move(children), std::move(output_schema), plan_node_id),
+      : UpdatePlanNode(std::move(children), std::move(output_schema), database_oid, table_oid, update_primary_key, indexed_update, sets, index_oids, plan_node_id),
         database_oid_(database_oid),
         table_oid_(table_oid),
         update_primary_key_(update_primary_key),
