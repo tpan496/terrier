@@ -158,6 +158,8 @@ class UpdatePlanNode : public AbstractPlanNode {
         indexed_update_(indexed_update),
         sets_(std::move(sets)),
         index_oids_(std::move(index_oids)) {}
+  
+  friend class TupleUpdatePlanNode;
 
  public:
   /**
