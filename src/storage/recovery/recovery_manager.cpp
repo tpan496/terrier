@@ -34,6 +34,7 @@
 #include "planner/plannodes/output_schema.h"
 #include "planner/plannodes/insert_plan_node.h"
 #include "planner/plannodes/tuple_delete_plan_node.h"
+#include "planner/plannodes/update_plan_node.h"
 #include "execution/compiler/expression/expression_translator.h"
 #include "execution/exec/execution_context.h"
 //#include "parser/expression/constant_value_expression.h"
@@ -295,11 +296,9 @@ void RecoveryManager::ReplayRedoRecord(transaction::TransactionContext *txn, Log
     tuple_slot_map_[old_tuple_slot] = new_tuple_slot;
 
   } else {
-    if (IsSpecialPGTables(table_oid)) {
-    } else {
-      UpdateRecordToUpdateTranslator(txn, sql_table_ptr, redo_record);
-      return;
-    }
+    UpdateRecordToUpdateTranslator(txn, sql_table_ptr, redo_record);
+    return;
+
     // STORAGE_LOG_ERROR("Update Record");
     auto new_tuple_slot = tuple_slot_map_[redo_record->GetTupleSlot()];
     redo_record->SetTupleSlot(new_tuple_slot);
