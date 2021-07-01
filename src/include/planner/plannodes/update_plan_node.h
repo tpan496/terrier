@@ -206,6 +206,8 @@ class UpdatePlanNode : public AbstractPlanNode {
    */
   const std::vector<catalog::index_oid_t> &GetIndexOids() const { return index_oids_; }
 
+  void SetUseTupleSlot(bool use) { use_tuple_slot_ = use; }
+  
   bool UseTupleSlot() const { return use_tuple_slot_; }
 
   /**
