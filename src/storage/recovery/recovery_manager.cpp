@@ -34,7 +34,7 @@
 #include "planner/plannodes/output_schema.h"
 #include "planner/plannodes/insert_plan_node.h"
 #include "planner/plannodes/tuple_delete_plan_node.h"
-#include "planner/plannodes/update_plan_node.h"
+#include "planner/plannodes/tuple_update_plan_node.h"
 #include "execution/compiler/expression/expression_translator.h"
 #include "execution/exec/execution_context.h"
 //#include "parser/expression/constant_value_expression.h"
