@@ -385,12 +385,12 @@ void OpExecOUFeatureVectorFilter(noisepage::selfdriving::ExecOUFeatureVector *co
 }
 
 void OpRegisterThreadWithMetricsManager(noisepage::execution::exec::ExecutionContext *exec_ctx) {
-  //auto t1 = high_resolution_clock::now();
+  auto t1 = high_resolution_clock::now();
   //return;
   exec_ctx->RegisterThreadWithMetricsManager();
-  //auto t2 = high_resolution_clock::now();
-  //auto ms_int = duration_cast<nanoseconds>(t2 - t1);
-  //EXECUTION_LOG_ERROR("OpRegisterThreadWithMetricsManager: {}", ms_int.count());
+  auto t2 = high_resolution_clock::now();
+  auto ms_int = duration_cast<nanoseconds>(t2 - t1);
+  EXECUTION_LOG_ERROR("OpRegisterThreadWithMetricsManager: {}", ms_int.count());
 }
 
 void OpEnsureTrackersStopped(noisepage::execution::exec::ExecutionContext *exec_ctx) {
