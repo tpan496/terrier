@@ -1182,7 +1182,7 @@ void RecoveryManager::InsertRedoRecordToInsertTranslator(transaction::Transactio
                                                          storage::RedoRecord *redo_record,
                                                          std::vector<byte *> varlen_contents) {
   auto t0 = std::chrono::high_resolution_clock::now();
-  auto t1 = std::chrono::high_resolution_clock::now();
+  //auto t1 = std::chrono::high_resolution_clock::now();
   std::unique_ptr<catalog::CatalogAccessor> accessor =
       catalog_->GetAccessor(common::ManagedPointer(txn), redo_record->GetDatabaseOid(), DISABLED);
   
@@ -1340,7 +1340,7 @@ void RecoveryManager::InsertRedoRecordToInsertTranslator(transaction::Transactio
 
   exec_queries_[query_identifier]->Run(common::ManagedPointer(exec_ctx), execution::vm::ExecutionMode::Compiled);
   auto t3 = std::chrono::high_resolution_clock::now();
-  EXECUTION_LOG_ERROR("Delay: {}, Prep: {}, Run: {}", std::chrono::duration_cast<std::chrono::nanoseconds>(t1 - t0).count(), std::chrono::duration_cast<std::chrono::nanoseconds>(t2 - t1).count(), std::chrono::duration_cast<std::chrono::nanoseconds>(t3 - t2).count());
+  EXECUTION_LOG_ERROR("Prep: {}, Run: {}", std::chrono::duration_cast<std::chrono::nanoseconds>(t2 - t0).count(), std::chrono::duration_cast<std::chrono::nanoseconds>(t3 - t2).count());
 
   // Update tuple slots.
   auto new_tuple_slot = *exec_ctx->GetTupleSlot();
