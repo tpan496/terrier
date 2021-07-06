@@ -118,6 +118,7 @@ BENCHMARK_DEFINE_F(RecoveryBenchmark, ReadWriteWorkload)(benchmark::State &state
  * High-stress workload, blast a narrow table with inserts (5 statements per txn, 100% inserts).
  */
 // NOLINTNEXTLINE
+/*
 BENCHMARK_DEFINE_F(RecoveryBenchmark, HighStress)(benchmark::State &state) {
   LargeSqlTableTestConfiguration config = LargeSqlTableTestConfiguration::Builder()
                                               .SetNumDatabases(1)
@@ -130,13 +131,14 @@ BENCHMARK_DEFINE_F(RecoveryBenchmark, HighStress)(benchmark::State &state) {
                                               .Build();
 
   RunBenchmark(&state, config);
-}
+}*/
 
 /**
  * Similar to high-stress workload, blast a narrow table with inserts (1 statements per txn, 100% inserts), but also
  * recovery indexes built on the table
  */
 // NOLINTNEXTLINE
+/*
 BENCHMARK_DEFINE_F(RecoveryBenchmark, IndexRecovery)(benchmark::State &state) {
   auto db_name = "testdb";
   auto table_name = "testtable";
@@ -243,7 +245,7 @@ BENCHMARK_DEFINE_F(RecoveryBenchmark, IndexRecovery)(benchmark::State &state) {
     state.SetIterationTime(static_cast<double>(elapsed_ms) / 1000.0);
   }
   state.SetItemsProcessed(num_txns_ * state.iterations());
-}
+}*/
 
 // ----------------------------------------------------------------------------
 // BENCHMARK REGISTRATION
@@ -253,6 +255,7 @@ BENCHMARK_REGISTER_F(RecoveryBenchmark, ReadWriteWorkload)
     ->Unit(benchmark::kMillisecond)
     ->UseManualTime()
     ->MinTime(10);
+/*
 BENCHMARK_REGISTER_F(RecoveryBenchmark, HighStress)
     ->Unit(benchmark::kMillisecond)
     ->UseManualTime()
@@ -260,7 +263,7 @@ BENCHMARK_REGISTER_F(RecoveryBenchmark, HighStress)
 BENCHMARK_REGISTER_F(RecoveryBenchmark, IndexRecovery)
     ->Unit(benchmark::kMillisecond)
     ->UseManualTime()
-    ->MinTime(4);
+    ->MinTime(4);*/
 // clang-format on
 
 }  // namespace noisepage
