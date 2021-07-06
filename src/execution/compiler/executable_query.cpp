@@ -36,6 +36,7 @@ using std::chrono::nanoseconds;
 
 void ExecutableQuery::Fragment::Run(byte query_state[], vm::ExecutionMode mode) const {
   using Function = std::function<void(void *)>;
+  std::unordered_map<std::string, int> m;
 
   auto exec_ctx = *reinterpret_cast<exec::ExecutionContext **>(query_state);
   if (exec_ctx->GetTxn()->MustAbort()) {
@@ -48,11 +49,10 @@ void ExecutableQuery::Fragment::Run(byte query_state[], vm::ExecutionMode mode) 
                                 common::ErrorCode::ERRCODE_INTERNAL_ERROR);
     }
     try {
-      //auto t1 = high_resolution_clock::now();
+      auto t1 = high_resolution_clock::now();
       func(query_state);
-      //auto t2 = high_resolution_clock::now();
-      //auto ms_int = duration_cast<nanoseconds>(t2 - t1);
-      //EXECUTION_LOG_ERROR("{}: {}", func_name, ms_int.count());
+      auto t2 = high_resolution_clock::now();
+      m[func_name] = duration_cast<nanoseconds>(t2 - t1).count();
     } catch (const AbortException &e) {
       for (const auto &teardown_name : teardown_fn_) {
         if (!module_->GetFunction(teardown_name, mode, &func)) {
@@ -63,6 +63,10 @@ void ExecutableQuery::Fragment::Run(byte query_state[], vm::ExecutionMode mode) 
       }
       return;
     }
+  }
+
+  for (auto& it : m) {
+    EXECUTION_LOG_ERROR("{}: {}", it.first, it.second);
   }
 }
 
@@ -163,7 +167,6 @@ void ExecutableQuery::Setup(std::vector<std::unique_ptr<Fragment>> &&fragments, 
 
 void ExecutableQuery::Run(common::ManagedPointer<exec::ExecutionContext> exec_ctx, vm::ExecutionMode mode) {
   // First, allocate the query state and move the execution context into it.
-  auto t1 = high_resolution_clock::now();
   auto query_state = std::make_unique<byte[]>(query_state_size_);
   *reinterpret_cast<exec::ExecutionContext **>(query_state.get()) = exec_ctx.Get();
   exec_ctx->SetQueryState(query_state.get());
@@ -171,14 +174,11 @@ void ExecutableQuery::Run(common::ManagedPointer<exec::ExecutionContext> exec_ct
   exec_ctx->SetExecutionMode(static_cast<uint8_t>(mode));
   exec_ctx->SetPipelineOperatingUnits(GetPipelineOperatingUnits());
   exec_ctx->SetQueryId(query_id_);
-  auto t2 = high_resolution_clock::now();
 
   // Now run through fragments.
   for (const auto &fragment : fragments_) {
     fragment->Run(query_state.get(), mode);
   }
-  auto t3 = high_resolution_clock::now();
-  EXECUTION_LOG_ERROR("Prep: {}, Fragment: {}", std::chrono::duration_cast<std::chrono::nanoseconds>(t2 - t1).count(), std::chrono::duration_cast<std::chrono::nanoseconds>(t3 - t2).count());
 
   // We do not currently re-use ExecutionContexts. However, this is unset to help ensure
   // we don't *intentionally* retain any dangling pointers.
