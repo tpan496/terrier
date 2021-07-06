@@ -1182,7 +1182,7 @@ void RecoveryManager::InsertRedoRecordToInsertTranslator(transaction::Transactio
                                                          storage::RedoRecord *redo_record,
                                                          std::vector<byte *> varlen_contents) {
   auto t0 = std::chrono::high_resolution_clock::now();
-  auto t1 = std::chrono::high_resolution_clock::now();
+  //auto t1 = std::chrono::high_resolution_clock::now();
   std::unique_ptr<catalog::CatalogAccessor> accessor =
       catalog_->GetAccessor(common::ManagedPointer(txn), redo_record->GetDatabaseOid(), DISABLED);
   
