@@ -275,8 +275,8 @@ void RecoveryManager::ReplayRedoRecord(transaction::TransactionContext *txn, Log
     auto table_oid = redo_record->GetTableOid();
     if (IsSpecialPGTables(table_oid)) {
     } else {
-      InsertRedoRecordToInsertTranslator(txn, sql_table_ptr, redo_record, varlen_contents);
-      return;
+      //InsertRedoRecordToInsertTranslator(txn, sql_table_ptr, redo_record, varlen_contents);
+      //return;
     }
 
     // Save the old tuple slot, and reset the tuple slot in the record
