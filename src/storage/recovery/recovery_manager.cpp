@@ -1336,11 +1336,11 @@ void RecoveryManager::InsertRedoRecordToInsertTranslator(transaction::Transactio
   //}
 
   auto t2 = std::chrono::high_resolution_clock::now();
-  EXECUTION_LOG_ERROR("Prep: {}", duration_cast<std::chrono::nanoseconds>(t2 - t1).count());
+  EXECUTION_LOG_ERROR("Prep: {}", std::chrono::duration_cast<std::chrono::nanoseconds>(t2 - t1).count());
 
   exec_queries_[query_identifier]->Run(common::ManagedPointer(exec_ctx), execution::vm::ExecutionMode::Compiled);
   auto t3 = std::chrono::high_resolution_clock::now();
-  EXECUTION_LOG_ERROR("Run: {}", duration_cast<std::chrono::nanoseconds>(t3 - t2).count());
+  EXECUTION_LOG_ERROR("Run: {}", std::chrono::duration_cast<std::chrono::nanoseconds>(t3 - t2).count());
 
   // Update tuple slots.
   auto new_tuple_slot = *exec_ctx->GetTupleSlot();
