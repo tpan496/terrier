@@ -1182,8 +1182,8 @@ void RecoveryManager::InsertRedoRecordToInsertTranslator(transaction::Transactio
                                                          storage::RedoRecord *redo_record,
                                                          std::vector<byte *> varlen_contents) {
   auto t1 = std::chrono::high_resolution_clock::now();
-  //auto t0 = std::chrono::high_resolution_clock::now();
-  //EXECUTION_LOG_ERROR("Delay: {}", std::chrono::duration_cast<std::chrono::nanoseconds>(t0 - t1).count());
+  auto t0 = std::chrono::high_resolution_clock::now();
+  EXECUTION_LOG_ERROR("Start: {}", std::chrono::duration_cast<std::chrono::nanoseconds>(t0 - t1).count());
   std::unique_ptr<catalog::CatalogAccessor> accessor =
       catalog_->GetAccessor(common::ManagedPointer(txn), redo_record->GetDatabaseOid(), DISABLED);
   
