@@ -163,6 +163,7 @@ void ExecutableQuery::Setup(std::vector<std::unique_ptr<Fragment>> &&fragments, 
 
 void ExecutableQuery::Run(common::ManagedPointer<exec::ExecutionContext> exec_ctx, vm::ExecutionMode mode) {
   // First, allocate the query state and move the execution context into it.
+  auto t1 = high_resolution_clock::now();
   auto query_state = std::make_unique<byte[]>(query_state_size_);
   *reinterpret_cast<exec::ExecutionContext **>(query_state.get()) = exec_ctx.Get();
   exec_ctx->SetQueryState(query_state.get());
@@ -170,11 +171,14 @@ void ExecutableQuery::Run(common::ManagedPointer<exec::ExecutionContext> exec_ct
   exec_ctx->SetExecutionMode(static_cast<uint8_t>(mode));
   exec_ctx->SetPipelineOperatingUnits(GetPipelineOperatingUnits());
   exec_ctx->SetQueryId(query_id_);
+  auto t2 = high_resolution_clock::now();
 
   // Now run through fragments.
   for (const auto &fragment : fragments_) {
     fragment->Run(query_state.get(), mode);
   }
+  auto t3 = high_resolution_clock::now();
+  EXECUTION_LOG_ERROR("Prep: {}, Fragment: {}", std::chrono::duration_cast<std::chrono::nanoseconds>(t2 - t1).count(), std::chrono::duration_cast<std::chrono::nanoseconds>(t3 - t2).count());
 
   // We do not currently re-use ExecutionContexts. However, this is unset to help ensure
   // we don't *intentionally* retain any dangling pointers.
