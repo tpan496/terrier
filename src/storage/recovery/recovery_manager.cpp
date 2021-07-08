@@ -1412,7 +1412,7 @@ void RecoveryManager::InsertRedoRecordToInsertTranslator(transaction::Transactio
 
   //auto t2 = std::chrono::high_resolution_clock::now();
 
-  exec_queries_[query_identifier]->Run(common::ManagedPointer(exec_ctx), execution::vm::ExecutionMode::Interpret);
+  exec_queries_[query_identifier]->Run(common::ManagedPointer(exec_ctx), execution::vm::ExecutionMode::Compiled);
   //auto t3 = std::chrono::high_resolution_clock::now();
   //EXECUTION_LOG_ERROR("Prep: {}, Run: {}", std::chrono::duration_cast<std::chrono::nanoseconds>(t2 - t0).count(), std::chrono::duration_cast<std::chrono::nanoseconds>(t3 - t2).count());
 
