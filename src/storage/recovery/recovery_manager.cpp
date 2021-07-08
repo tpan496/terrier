@@ -1224,84 +1224,158 @@ void RecoveryManager::InsertRedoRecordToInsertTranslator(transaction::Transactio
   owned_exprs_.clear();
   std::unordered_map<catalog::col_oid_t, type::TypeId>& col_types = all_col_types_[query_identifier];
   std::unordered_map<col_id_t, catalog::col_oid_t>& id_to_oid = ids_to_oids_[query_identifier];
-  for (uint16_t i = 0; i < redo_record->Delta()->NumColumns(); i++) {
-    col_id_t col_id = redo_record->Delta()->ColumnIds()[i];
-    // We should ingore the version pointer column, this is a hidden storage layer column
-    if (col_id != VERSION_POINTER_COLUMN_ID) {
-      catalog::col_oid_t col_oid = id_to_oid[col_id];
-      type::TypeId value_type = col_types[col_oid];
-      const auto type_id = execution::sql::GetTypeId(value_type);
-      byte *raw_bytes = redo_record->Delta()->AccessWithNullCheck(i);
-      common::ManagedPointer<parser::AbstractExpression> expr;
-      parser::ConstantValueExpression param;
-      if (raw_bytes == nullptr) {
-        param = parser::ConstantValueExpression();
-      } else {
-        switch (type_id) {
-          case execution::sql::TypeId::Boolean: {
-            auto val = *(reinterpret_cast<bool *>(raw_bytes));
-            expr = MakeManaged(std::make_unique<parser::ParameterValueExpression>(static_cast<uint32_t>(col_oid)-1, type::TypeId::BOOLEAN));
-            param = parser::ConstantValueExpression(type::TypeId::BOOLEAN, execution::sql::BoolVal(val));
-            break;
+
+  if (!found) {
+    // We need to get the values.
+    for (uint16_t i = 0; i < redo_record->Delta()->NumColumns(); i++) {
+      col_id_t col_id = redo_record->Delta()->ColumnIds()[i];
+      // We should ingore the version pointer column, this is a hidden storage layer column
+      if (col_id != VERSION_POINTER_COLUMN_ID) {
+        catalog::col_oid_t col_oid = id_to_oid[col_id];
+        type::TypeId value_type = col_types[col_oid];
+        const auto type_id = execution::sql::GetTypeId(value_type);
+        byte *raw_bytes = redo_record->Delta()->AccessWithNullCheck(i);
+        common::ManagedPointer<parser::AbstractExpression> expr;
+        parser::ConstantValueExpression param;
+        if (raw_bytes == nullptr) {
+          param = parser::ConstantValueExpression();
+        } else {
+          switch (type_id) {
+            case execution::sql::TypeId::Boolean: {
+              auto val = *(reinterpret_cast<bool *>(raw_bytes));
+              expr = MakeManaged(std::make_unique<parser::ParameterValueExpression>(static_cast<uint32_t>(col_oid)-1, type::TypeId::BOOLEAN));
+              param = parser::ConstantValueExpression(type::TypeId::BOOLEAN, execution::sql::BoolVal(val));
+              break;
+            }
+            case execution::sql::TypeId::TinyInt: {
+              auto val = *(reinterpret_cast<int64_t *>(reinterpret_cast<int8_t *>(raw_bytes)));
+              expr = MakeManaged(std::make_unique<parser::ParameterValueExpression>(static_cast<uint32_t>(col_oid)-1, type::TypeId::TINYINT));
+              param = parser::ConstantValueExpression(type::TypeId::TINYINT, execution::sql::Integer(val));
+              break;
+            }
+            case execution::sql::TypeId::SmallInt: {
+              auto val = *(reinterpret_cast<int64_t *>(reinterpret_cast<int16_t *>(raw_bytes)));
+              expr = MakeManaged(std::make_unique<parser::ParameterValueExpression>(static_cast<uint32_t>(col_oid)-1, type::TypeId::SMALLINT));
+              param = parser::ConstantValueExpression(type::TypeId::SMALLINT, execution::sql::Integer(val));
+              break;
+            }
+            case execution::sql::TypeId::Integer: {
+              auto val = *(reinterpret_cast<int64_t *>(reinterpret_cast<int32_t *>(raw_bytes)));
+              expr = MakeManaged(std::make_unique<parser::ParameterValueExpression>(static_cast<uint32_t>(col_oid)-1, type::TypeId::INTEGER));
+              param = parser::ConstantValueExpression(type::TypeId::INTEGER, execution::sql::Integer(val));
+              break;
+            }
+            case execution::sql::TypeId::BigInt: {
+              auto val = *(reinterpret_cast<int64_t *>(raw_bytes));
+              expr = MakeManaged(std::make_unique<parser::ParameterValueExpression>(static_cast<uint32_t>(col_oid)-1, type::TypeId::BIGINT));
+              param = parser::ConstantValueExpression(type::TypeId::BIGINT, execution::sql::Integer(val));
+              break;
+            }
+            case execution::sql::TypeId::Double: {
+              auto val = *(reinterpret_cast<double *>(raw_bytes));
+              expr = MakeManaged(std::make_unique<parser::ParameterValueExpression>(static_cast<uint32_t>(col_oid)-1, type::TypeId::REAL));
+              param = parser::ConstantValueExpression(type::TypeId::REAL, execution::sql::Real(val));
+              break;
+            }
+            case execution::sql::TypeId::Date: {
+              auto date = execution::sql::Date::FromNative(*(reinterpret_cast<int32_t *>(raw_bytes)));
+              expr = MakeManaged(std::make_unique<parser::ParameterValueExpression>(static_cast<uint32_t>(col_oid)-1, type::TypeId::DATE));
+              param = parser::ConstantValueExpression(type::TypeId::DATE, execution::sql::DateVal(date));
+              break;
+            }
+            case execution::sql::TypeId::Timestamp: {
+              auto ts = execution::sql::Timestamp::FromNative(*(reinterpret_cast<uint64_t *>(raw_bytes)));
+              //expr = parser::ParameterValueExpression(static_cast<uint32_t>(col_oid)-1, type::TypeId::TINYINT);
+              param = parser::ConstantValueExpression(type::TypeId::TINYINT, execution::sql::TimestampVal(ts));
+              break;
+            }
+            case execution::sql::TypeId::Varchar: {
+              const auto *entry = reinterpret_cast<VarlenEntry *>(raw_bytes);
+              auto string_val = execution::sql::ValueUtil::CreateStringVal(std::string(entry->StringView()));
+              expr = MakeManaged(std::make_unique<parser::ParameterValueExpression>(static_cast<uint32_t>(col_oid)-1, type::TypeId::VARCHAR));
+              param = parser::ConstantValueExpression(type::TypeId::VARCHAR, string_val.first,
+                                                                          std::move(string_val.second));
+              break;
+            }
+            default:
+              throw NOT_IMPLEMENTED_EXCEPTION(fmt::format("Translation of constant type {}", TypeIdToString(type_id)));
           }
-          case execution::sql::TypeId::TinyInt: {
-            auto val = *(reinterpret_cast<int64_t *>(reinterpret_cast<int8_t *>(raw_bytes)));
-            expr = MakeManaged(std::make_unique<parser::ParameterValueExpression>(static_cast<uint32_t>(col_oid)-1, type::TypeId::TINYINT));
-            param = parser::ConstantValueExpression(type::TypeId::TINYINT, execution::sql::Integer(val));
-            break;
-          }
-          case execution::sql::TypeId::SmallInt: {
-            auto val = *(reinterpret_cast<int64_t *>(reinterpret_cast<int16_t *>(raw_bytes)));
-            expr = MakeManaged(std::make_unique<parser::ParameterValueExpression>(static_cast<uint32_t>(col_oid)-1, type::TypeId::SMALLINT));
-            param = parser::ConstantValueExpression(type::TypeId::SMALLINT, execution::sql::Integer(val));
-            break;
-          }
-          case execution::sql::TypeId::Integer: {
-            auto val = *(reinterpret_cast<int64_t *>(reinterpret_cast<int32_t *>(raw_bytes)));
-            expr = MakeManaged(std::make_unique<parser::ParameterValueExpression>(static_cast<uint32_t>(col_oid)-1, type::TypeId::INTEGER));
-            param = parser::ConstantValueExpression(type::TypeId::INTEGER, execution::sql::Integer(val));
-            break;
-          }
-          case execution::sql::TypeId::BigInt: {
-            auto val = *(reinterpret_cast<int64_t *>(raw_bytes));
-            expr = MakeManaged(std::make_unique<parser::ParameterValueExpression>(static_cast<uint32_t>(col_oid)-1, type::TypeId::BIGINT));
-            param = parser::ConstantValueExpression(type::TypeId::BIGINT, execution::sql::Integer(val));
-            break;
-          }
-          case execution::sql::TypeId::Double: {
-            auto val = *(reinterpret_cast<double *>(raw_bytes));
-            expr = MakeManaged(std::make_unique<parser::ParameterValueExpression>(static_cast<uint32_t>(col_oid)-1, type::TypeId::REAL));
-            param = parser::ConstantValueExpression(type::TypeId::REAL, execution::sql::Real(val));
-            break;
-          }
-          case execution::sql::TypeId::Date: {
-            auto date = execution::sql::Date::FromNative(*(reinterpret_cast<int32_t *>(raw_bytes)));
-            expr = MakeManaged(std::make_unique<parser::ParameterValueExpression>(static_cast<uint32_t>(col_oid)-1, type::TypeId::DATE));
-            param = parser::ConstantValueExpression(type::TypeId::DATE, execution::sql::DateVal(date));
-            break;
-          }
-          case execution::sql::TypeId::Timestamp: {
-            auto ts = execution::sql::Timestamp::FromNative(*(reinterpret_cast<uint64_t *>(raw_bytes)));
-            //expr = parser::ParameterValueExpression(static_cast<uint32_t>(col_oid)-1, type::TypeId::TINYINT);
-            param = parser::ConstantValueExpression(type::TypeId::TINYINT, execution::sql::TimestampVal(ts));
-            break;
-          }
-          case execution::sql::TypeId::Varchar: {
-            const auto *entry = reinterpret_cast<VarlenEntry *>(raw_bytes);
-            auto string_val = execution::sql::ValueUtil::CreateStringVal(std::string(entry->StringView()));
-            expr = MakeManaged(std::make_unique<parser::ParameterValueExpression>(static_cast<uint32_t>(col_oid)-1, type::TypeId::VARCHAR));
-            param = parser::ConstantValueExpression(type::TypeId::VARCHAR, string_val.first,
-                                                                         std::move(string_val.second));
-            break;
-          }
-          default:
-            throw NOT_IMPLEMENTED_EXCEPTION(fmt::format("Translation of constant type {}", TypeIdToString(type_id)));
         }
+        values[static_cast<uint32_t>(col_oid)-1] = expr;
+        params[static_cast<uint32_t>(col_oid)-1] = param;
       }
-      values[static_cast<uint32_t>(col_oid)-1] = expr;
-      params[static_cast<uint32_t>(col_oid)-1] = param;
+    }
+  } else {
+    // We do not need to get values.
+    for (uint16_t i = 0; i < redo_record->Delta()->NumColumns(); i++) {
+      col_id_t col_id = redo_record->Delta()->ColumnIds()[i];
+      // We should ingore the version pointer column, this is a hidden storage layer column
+      if (col_id != VERSION_POINTER_COLUMN_ID) {
+        catalog::col_oid_t col_oid = id_to_oid[col_id];
+        type::TypeId value_type = col_types[col_oid];
+        const auto type_id = execution::sql::GetTypeId(value_type);
+        byte *raw_bytes = redo_record->Delta()->AccessWithNullCheck(i);
+        parser::ConstantValueExpression param;
+        if (raw_bytes == nullptr) {
+          param = parser::ConstantValueExpression();
+        } else {
+          switch (type_id) {
+            case execution::sql::TypeId::Boolean: {
+              auto val = *(reinterpret_cast<bool *>(raw_bytes));
+              param = parser::ConstantValueExpression(type::TypeId::BOOLEAN, execution::sql::BoolVal(val));
+              break;
+            }
+            case execution::sql::TypeId::TinyInt: {
+              auto val = *(reinterpret_cast<int64_t *>(reinterpret_cast<int8_t *>(raw_bytes)));
+              param = parser::ConstantValueExpression(type::TypeId::TINYINT, execution::sql::Integer(val));
+              break;
+            }
+            case execution::sql::TypeId::SmallInt: {
+              auto val = *(reinterpret_cast<int64_t *>(reinterpret_cast<int16_t *>(raw_bytes)));
+              param = parser::ConstantValueExpression(type::TypeId::SMALLINT, execution::sql::Integer(val));
+              break;
+            }
+            case execution::sql::TypeId::Integer: {
+              auto val = *(reinterpret_cast<int64_t *>(reinterpret_cast<int32_t *>(raw_bytes)));
+              param = parser::ConstantValueExpression(type::TypeId::INTEGER, execution::sql::Integer(val));
+              break;
+            }
+            case execution::sql::TypeId::BigInt: {
+              auto val = *(reinterpret_cast<int64_t *>(raw_bytes));
+              param = parser::ConstantValueExpression(type::TypeId::BIGINT, execution::sql::Integer(val));
+              break;
+            }
+            case execution::sql::TypeId::Double: {
+              auto val = *(reinterpret_cast<double *>(raw_bytes));
+              param = parser::ConstantValueExpression(type::TypeId::REAL, execution::sql::Real(val));
+              break;
+            }
+            case execution::sql::TypeId::Date: {
+              auto date = execution::sql::Date::FromNative(*(reinterpret_cast<int32_t *>(raw_bytes)));
+              param = parser::ConstantValueExpression(type::TypeId::DATE, execution::sql::DateVal(date));
+              break;
+            }
+            case execution::sql::TypeId::Timestamp: {
+              auto ts = execution::sql::Timestamp::FromNative(*(reinterpret_cast<uint64_t *>(raw_bytes)));
+              param = parser::ConstantValueExpression(type::TypeId::TINYINT, execution::sql::TimestampVal(ts));
+              break;
+            }
+            case execution::sql::TypeId::Varchar: {
+              const auto *entry = reinterpret_cast<VarlenEntry *>(raw_bytes);
+              auto string_val = execution::sql::ValueUtil::CreateStringVal(std::string(entry->StringView()));
+              param = parser::ConstantValueExpression(type::TypeId::VARCHAR, string_val.first,
+                                                                          std::move(string_val.second));
+              break;
+            }
+            default:
+              throw NOT_IMPLEMENTED_EXCEPTION(fmt::format("Translation of constant type {}", TypeIdToString(type_id)));
+          }
+        }
+        params[static_cast<uint32_t>(col_oid)-1] = param;
+      }
     }
   }
+ 
 
   if (!found) {
     // Convert the redo record into a plannode.
