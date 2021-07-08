@@ -1455,7 +1455,7 @@ void RecoveryManager::DeleteRecordToDeleteTranslator(transaction::TransactionCon
       delete_record->GetDatabaseOid(), common::ManagedPointer<transaction::TransactionContext>(txn), callback,
                                         out_plan->GetOutputSchema().Get(), common::ManagedPointer<catalog::CatalogAccessor>(accessor), exec_settings, DISABLED, DISABLED, DISABLED);
   exec_ctx->SetTupleSlot(new_tuple_slot);
-  exec_query->Run(common::ManagedPointer(exec_ctx), execution::vm::ExecutionMode::Interpret);
+  exec_query->Run(common::ManagedPointer(exec_ctx), execution::vm::ExecutionMode::Compiled);
 
   // Process Index
   // Fetch all the values so we can construct index keys after deleting from the sql table
