@@ -298,8 +298,8 @@ void RecoveryManager::ReplayRedoRecord(transaction::TransactionContext *txn, Log
     tuple_slot_map_[old_tuple_slot] = new_tuple_slot;
 
   } else {
-    //UpdateRecordToUpdateTranslator(txn, sql_table_ptr, redo_record);
-    //return;
+    UpdateRecordToUpdateTranslator(txn, sql_table_ptr, redo_record);
+    return;
 
     // STORAGE_LOG_ERROR("Update Record");
     auto new_tuple_slot = tuple_slot_map_[redo_record->GetTupleSlot()];
@@ -1305,6 +1305,29 @@ void RecoveryManager::InsertRedoRecordToInsertTranslator(transaction::Transactio
         params[static_cast<uint32_t>(col_oid)-1] = param;
       }
     }
+
+    // Convert the redo record into a plannode.
+    planner::InsertPlanNode::Builder plan_builder;
+    plan_builder.SetDatabaseOid(redo_record->GetDatabaseOid());
+    plan_builder.SetTableOid(redo_record->GetTableOid());
+    plan_builder.SetInsertType(parser::InsertType::VALUES);
+    plan_builder.SetOutputSchema(std::make_unique<planner::OutputSchema>());
+
+    for (const auto &col : schema.GetColumns()) {
+      plan_builder.AddParameterInfo(col.Oid());
+    }
+
+    plan_builder.AddValues(std::move(values));
+
+    // Stores index objects.
+    std::vector<catalog::index_oid_t> index_oids = accessor->GetIndexOids(redo_record->GetTableOid());
+    plan_builder.SetIndexOids(std::move(index_oids));
+    
+    std::unique_ptr<planner::InsertPlanNode> out_plan = plan_builder.Build();
+
+    // Compile the plannode.
+    exec_queries_[query_identifier] = execution::compiler::CompilationContext::Compile(*out_plan, exec_settings, accessor.get(),
+                                                                      execution::compiler::CompilationMode::OneShot);
   } else {
     // We do not need to get values.
     for (uint16_t i = 0; i < redo_record->Delta()->NumColumns(); i++) {
@@ -1374,32 +1397,6 @@ void RecoveryManager::InsertRedoRecordToInsertTranslator(transaction::Transactio
         params[static_cast<uint32_t>(col_oid)-1] = param;
       }
     }
-  }
- 
-
-  if (!found) {
-    // Convert the redo record into a plannode.
-    planner::InsertPlanNode::Builder plan_builder;
-    plan_builder.SetDatabaseOid(redo_record->GetDatabaseOid());
-    plan_builder.SetTableOid(redo_record->GetTableOid());
-    plan_builder.SetInsertType(parser::InsertType::VALUES);
-    plan_builder.SetOutputSchema(std::make_unique<planner::OutputSchema>());
-
-    for (const auto &col : schema.GetColumns()) {
-      plan_builder.AddParameterInfo(col.Oid());
-    }
-
-    plan_builder.AddValues(std::move(values));
-
-    // Stores index objects.
-    std::vector<catalog::index_oid_t> index_oids = accessor->GetIndexOids(redo_record->GetTableOid());
-    plan_builder.SetIndexOids(std::move(index_oids));
-    
-    std::unique_ptr<planner::InsertPlanNode> out_plan = plan_builder.Build();
-
-    // Compile the plannode.
-    exec_queries_[query_identifier] = execution::compiler::CompilationContext::Compile(*out_plan, exec_settings, accessor.get(),
-                                                                      execution::compiler::CompilationMode::OneShot);
   }
 
   execution::exec::OutputCallback callback = InsertCallback;
