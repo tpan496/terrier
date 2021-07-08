@@ -84,6 +84,7 @@ class RecoveryBenchmark : public benchmark::Fixture {
         common::ScopedTimer<std::chrono::milliseconds> timer(&elapsed_ms);
         recovery_manager.StartRecovery();
         recovery_manager.WaitForRecoveryToFinish();
+        std::cout << "Recovery Ended" << std::endl;
       }
 
       state->SetIterationTime(static_cast<double>(elapsed_ms) / 1000.0);
