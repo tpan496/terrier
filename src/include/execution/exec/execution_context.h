@@ -17,6 +17,8 @@
 #include "self_driving/modeling/operating_unit.h"
 #include "self_driving/modeling/operating_unit_defs.h"
 
+#include "storage/projected_row.h"
+
 namespace noisepage::catalog {
 class CatalogAccessor;
 }  // namespace noisepage::catalog
@@ -38,6 +40,7 @@ class PipelineOperatingUnits;
 }  // namespace noisepage::selfdriving
 
 namespace noisepage::storage {
+class RedoRecord;
 class RecoveryManager;
 }  // namespace noisepage::storage
 
@@ -344,11 +347,19 @@ class EXPORT ExecutionContext {
    */
   void SetTupleSlot(storage::TupleSlot tuple_slot) { tuple_slot_ = tuple_slot; }
 
+  void SetIndexPR(storage::ProjectedRow* pr) { index_pr_ = pr; }
+
+  void SetRedoRecord(storage::RedoRecord* redo_record) { redo_record_ = redo_record;}
+
   /**
    * Gets the tuple slot used for an Insert.
    * @return tuple slot
    */
   storage::TupleSlot* GetTupleSlot() { return &tuple_slot_; }
+
+  storage::ProjectedRow* GetIndexPR() { return index_pr_; }
+
+  storage::RedoRecord* GetRedoRecord() { return redo_record_; }
 
  private:
   query_id_t query_id_{execution::query_id_t(0)};
@@ -382,5 +393,7 @@ class EXPORT ExecutionContext {
   std::vector<HookFn> hooks_{};
   void *query_state_;
   storage::TupleSlot tuple_slot_;
+  storage::RedoRecord* redo_record_;
+  storage::ProjectedRow *index_pr_{nullptr};
 };
 }  // namespace noisepage::execution::exec

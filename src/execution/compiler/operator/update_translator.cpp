@@ -23,15 +23,16 @@ UpdateTranslator::UpdateTranslator(const planner::UpdatePlanNode &plan, Compilat
       all_oids_(CollectOids(table_schema_)),
       table_pm_(GetCodeGen()->GetCatalogAccessor()->GetTable(plan.GetTableOid())->ProjectionMapForOids(all_oids_)) {
   pipeline->RegisterSource(this, Pipeline::Parallelism::Serial);
-  if (!plan.UseTupleSlot()) {
+  if (!plan.UseRecoveryTupleSlot()) {
     compilation_context->Prepare(*plan.GetChild(0), pipeline);
+    for (const auto &clause : plan.GetSetClauses()) {
+      compilation_context->Prepare(*clause.second);
+    }
   } else {
+    // Creates a dummy tuple slot member.
+    // The actual tuple slot will be passed from the execution context.
     ast::Expr *tuple_slot_type = GetCodeGen()->BuiltinType(ast::BuiltinType::TupleSlot);
     tuple_slot_ = pipeline->DeclarePipelineStateEntry("tuple_slot", tuple_slot_type);
-  }
-
-  for (const auto &clause : plan.GetSetClauses()) {
-    compilation_context->Prepare(*clause.second);
   }
 
   auto &index_oids = GetPlanAs<planner::UpdatePlanNode>().GetIndexOids();
@@ -87,6 +88,7 @@ void UpdateTranslator::PerformPipelineWork(WorkContext *context, FunctionBuilder
     // Non-indexed updates just update.
     GenTableUpdate(function);
   }
+  
   function->Append(GetCodeGen()->ExecCtxAddRowsAffected(GetExecutionContext(), 1));
 
   CounterAdd(function, num_updates_, 1);
@@ -210,7 +212,7 @@ void UpdateTranslator::GenSetTablePR(FunctionBuilder *builder, WorkContext *cont
 void UpdateTranslator::GenTableUpdate(FunctionBuilder *builder) const {
   // if (!tableUpdate(&pipelineState.storageInterface) { Abort(); }
   const auto &op = GetPlanAs<planner::UpdatePlanNode>();
-  if (op.UseTupleSlot()) {
+  if (op.UseRecoveryTupleSlot()) {
     std::vector<ast::Expr *> update_args{si_updater_.GetPtr(GetCodeGen()), tuple_slot_.GetPtr(GetCodeGen())};
     auto *update_call = GetCodeGen()->CallBuiltin(ast::Builtin::TableUpdate, update_args);
 
@@ -274,18 +276,31 @@ void UpdateTranslator::GenIndexInsert(WorkContext *context, FunctionBuilder *bui
 void UpdateTranslator::GenTableDelete(FunctionBuilder *builder) const {
   // if (!@tableDelete(&pipelineState.storageInterface, &slot)) { Abort(); }
   const auto &op = GetPlanAs<planner::UpdatePlanNode>();
-  const auto &child = GetCompilationContext()->LookupTranslator(*op.GetChild(0));
-  NOISEPAGE_ASSERT(child != nullptr, "delete should have a child");
-  const auto &delete_slot = child->GetSlotAddress();
-  std::vector<ast::Expr *> delete_args{si_updater_.GetPtr(GetCodeGen()), delete_slot};
-  auto *delete_call = GetCodeGen()->CallBuiltin(ast::Builtin::TableDelete, delete_args);
-  auto *delete_failed = GetCodeGen()->UnaryOp(parsing::Token::Type::BANG, delete_call);
-  If check(builder, delete_failed);
-  {
-    // The delete was not successful; abort the transaction.
-    builder->Append(GetCodeGen()->AbortTxn(GetExecutionContext()));
+  if (op.UseRecoveryTupleSlot()) {
+    std::vector<ast::Expr *> delete_args{si_updater_.GetPtr(GetCodeGen()), tuple_slot_.GetPtr(GetCodeGen())};
+    auto *delete_call = GetCodeGen()->CallBuiltin(ast::Builtin::TableDelete, delete_args);
+    auto *delete_failed = GetCodeGen()->UnaryOp(parsing::Token::Type::BANG, delete_call);
+    If check(builder, delete_failed);
+    {
+      // The delete was not successful; abort the transaction.
+      //CounterAdd(builder, num_deletes_, 1);
+      builder->Append(GetCodeGen()->AbortTxn(GetExecutionContext()));
+    }
+    check.EndIf();
+  } else {
+    const auto &child = GetCompilationContext()->LookupTranslator(*op.GetChild(0));
+    NOISEPAGE_ASSERT(child != nullptr, "delete should have a child");
+    const auto &delete_slot = child->GetSlotAddress();
+    std::vector<ast::Expr *> delete_args{si_updater_.GetPtr(GetCodeGen()), delete_slot};
+    auto *delete_call = GetCodeGen()->CallBuiltin(ast::Builtin::TableDelete, delete_args);
+    auto *delete_failed = GetCodeGen()->UnaryOp(parsing::Token::Type::BANG, delete_call);
+    If check(builder, delete_failed);
+    {
+      // The delete was not successful; abort the transaction.
+      builder->Append(GetCodeGen()->AbortTxn(GetExecutionContext()));
+    }
+    check.EndIf();
   }
-  check.EndIf();
 }
 
 void UpdateTranslator::GenIndexDelete(FunctionBuilder *builder, WorkContext *context,

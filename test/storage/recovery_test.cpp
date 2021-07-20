@@ -237,7 +237,7 @@ class RecoveryTests : public TerrierTest {
     db_main_->GetTransactionLayer()->GetDeferredActionManager()->RegisterDeferredAction([=]() { delete tested; });
   }
 };
-
+/*
 // This test inserts some tuples into a single table. It then recreates the test table from
 // the log, and verifies that this new table is the same as the original table
 // NOLINTNEXTLINE
@@ -327,7 +327,7 @@ TEST_F(RecoveryTests, DropDatabaseTest) {
   EXPECT_FALSE(recovery_catalog_->GetDatabaseCatalog(common::ManagedPointer(txn), db_oid));
   recovery_txn_manager_->Commit(txn, transaction::TransactionUtil::EmptyCallback, nullptr);
 }
-
+*/
 // Tests that we correctly process records corresponding to a drop table command.
 // NOLINTNEXTLINE
 TEST_F(RecoveryTests, DropTableTest) {

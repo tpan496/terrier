@@ -217,7 +217,12 @@ void OpStorageInterfaceInit(noisepage::execution::sql::StorageInterface *storage
 void OpStorageInterfaceGetTablePR(noisepage::storage::ProjectedRow **pr_result,
                                   noisepage::execution::sql::StorageInterface *storage_interface) {
   //auto t1 = high_resolution_clock::now();
-  *pr_result = storage_interface->GetTablePR();
+  if (*storage_interface->GetExecutionContext()->GetTupleSlot() == noisepage::storage::TupleSlot()) {
+    *pr_result = storage_interface->GetTablePR();
+  } else {
+    storage_interface->SelectPR(*pr_result);
+  }
+  
   //auto t2 = high_resolution_clock::now();
   //auto ms_int = duration_cast<nanoseconds>(t2 - t1);
   //EXECUTION_LOG_ERROR("OpStorageInterfaceGetTablePR: {}", ms_int.count());

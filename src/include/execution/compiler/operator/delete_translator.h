@@ -5,6 +5,7 @@
 #include "execution/ast/identifier.h"
 #include "execution/compiler/operator/operator_translator.h"
 #include "execution/compiler/pipeline_driver.h"
+#include "storage/storage_defs.h"
 
 namespace noisepage::catalog {
 class Schema;
@@ -93,11 +94,12 @@ class DeleteTranslator : public OperatorTranslator, public PipelineDriver {
 
   // Codegen Replication only.
   // Sets the tuple slot to delete.
-    // thread local tuple slot
   StateDescriptor::Entry tuple_slot_;
 
   // The number of deletes that are performed.
   StateDescriptor::Entry num_deletes_;
+
+  ast::Identifier table_pr_;
 };
 
 }  // namespace noisepage::execution::compiler

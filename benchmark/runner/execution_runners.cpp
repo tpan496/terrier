@@ -1047,7 +1047,6 @@ void ExecutionRunners::ExecuteIndexOperation(benchmark::State *state, bool is_in
         }
       }
 
-      EXECUTION_LOG_ERROR("jb");
       OpStorageInterfaceTableInsert(&slot, &si);
     } else {
       bool has_more;

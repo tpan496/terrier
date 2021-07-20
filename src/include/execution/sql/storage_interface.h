@@ -110,6 +110,8 @@ class EXPORT StorageInterface {
    */
   bool IndexInsertWithTuple(storage::TupleSlot table_tuple_slot, bool unique);
 
+  void SelectPR(storage::ProjectedRow* pr);
+
   /**
    * @returns index heap size
    */

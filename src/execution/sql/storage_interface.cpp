@@ -98,4 +98,8 @@ bool StorageInterface::IndexInsertWithTuple(storage::TupleSlot table_tuple_slot,
   return curr_index_->Insert(exec_ctx_->GetTxn(), *index_pr_, table_tuple_slot);
 }
 
+void StorageInterface::SelectPR(storage::ProjectedRow* pr) {
+  table_->Select(exec_ctx_->GetTxn(), *exec_ctx_->GetTupleSlot(), pr);
+}
+
 }  // namespace noisepage::execution::sql

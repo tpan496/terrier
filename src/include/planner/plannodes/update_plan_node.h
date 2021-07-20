@@ -13,8 +13,6 @@
 
 namespace noisepage::planner {
 
-class TupleUpdatePlanNode;
-
 /**
  * Describes a single SET clause of an UPDATE query.
  * For UPDATE tbl SET [$1] = $2:
@@ -160,8 +158,6 @@ class UpdatePlanNode : public AbstractPlanNode {
         indexed_update_(indexed_update),
         sets_(std::move(sets)),
         index_oids_(std::move(index_oids)) {}
-  
-  friend class TupleUpdatePlanNode;
 
  public:
   /**
@@ -206,9 +202,9 @@ class UpdatePlanNode : public AbstractPlanNode {
    */
   const std::vector<catalog::index_oid_t> &GetIndexOids() const { return index_oids_; }
 
-  void SetUseTupleSlot(bool use) { use_tuple_slot_ = use; }
+  void SetUseRecoveryTupleSlot(bool use) { use_tuple_slot_ = use; }
   
-  bool UseTupleSlot() const { return use_tuple_slot_; }
+  bool UseRecoveryTupleSlot() const { return use_tuple_slot_; }
 
   /**
    * @return the hashed value of this plan node

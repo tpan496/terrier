@@ -33,8 +33,9 @@
 #include "execution/exec/execution_settings.h"
 #include "planner/plannodes/output_schema.h"
 #include "planner/plannodes/insert_plan_node.h"
-#include "planner/plannodes/tuple_delete_plan_node.h"
-#include "planner/plannodes/tuple_update_plan_node.h"
+#include "planner/plannodes/delete_plan_node.h"
+#include "planner/plannodes/update_plan_node.h"
+#include "planner/plannodes/seq_scan_plan_node.h"
 #include "execution/compiler/expression/expression_translator.h"
 #include "execution/exec/execution_context.h"
 //#include "parser/expression/constant_value_expression.h"
@@ -267,16 +268,16 @@ bool RecoveryManager::IsSpecialPGTables(catalog::table_oid_t table_oid) {
 
 void RecoveryManager::ReplayRedoRecord(transaction::TransactionContext *txn, LogRecord *record, std::vector<byte *> varlen_contents) {
   auto *redo_record = record->GetUnderlyingRecordBodyAs<RedoRecord>();
-  //STORAGE_LOG_ERROR(
-  //    fmt::format("DatabaseOid: {}, TableOid: {}", redo_record->GetDatabaseOid(), redo_record->GetTableOid()));
   auto sql_table_ptr = GetSqlTable(txn, redo_record->GetDatabaseOid(), redo_record->GetTableOid());
   if (IsInsertRecord(redo_record)) {
-    //STORAGE_LOG_ERROR("Insert Record");
     auto table_oid = redo_record->GetTableOid();
     if (IsSpecialPGTables(table_oid)) {
     } else {
-      InsertRedoRecordToInsertTranslator(txn, sql_table_ptr, redo_record, varlen_contents);
-      return;
+      // Recovery using codegen.
+      if (use_codegen_recovery_) {
+        //GenInsertReplay(txn, sql_table_ptr, redo_record, varlen_contents);
+        //return;
+      } 
     }
 
     // Save the old tuple slot, and reset the tuple slot in the record
@@ -298,10 +299,11 @@ void RecoveryManager::ReplayRedoRecord(transaction::TransactionContext *txn, Log
     tuple_slot_map_[old_tuple_slot] = new_tuple_slot;
 
   } else {
-    UpdateRecordToUpdateTranslator(txn, sql_table_ptr, redo_record);
-    return;
+    if (use_codegen_recovery_) {
+      //GenUpdateReplay(txn, sql_table_ptr, record);
+      //return;
+    }    
 
-    // STORAGE_LOG_ERROR("Update Record");
     auto new_tuple_slot = tuple_slot_map_[redo_record->GetTupleSlot()];
     redo_record->SetTupleSlot(new_tuple_slot);
     // Stage the write. This way the recovery operation is logged if logging is enabled
@@ -319,8 +321,13 @@ void RecoveryManager::ReplayDeleteRecord(transaction::TransactionContext *txn, L
   auto db_catalog_ptr = GetDatabaseCatalog(txn, delete_record->GetDatabaseOid());
   auto sql_table_ptr = db_catalog_ptr->GetTable(common::ManagedPointer(txn), delete_record->GetTableOid());
   const auto &schema = GetTableSchema(txn, db_catalog_ptr, delete_record->GetTableOid());
-  //DeleteRecordToDeleteTranslator(txn, sql_table_ptr, delete_record, new_tuple_slot);
-  //return;
+
+  // Recovery using codegen.
+  if (use_codegen_recovery_) {
+    GenDeleteReplay(txn, sql_table_ptr, delete_record, new_tuple_slot);
+    return;
+  }
+  
   // Stage the delete. This way the recovery operation is logged if logging is enabled
   txn->StageDelete(delete_record->GetDatabaseOid(), delete_record->GetTableOid(), new_tuple_slot);
 
@@ -340,7 +347,8 @@ void RecoveryManager::ReplayDeleteRecord(transaction::TransactionContext *txn, L
 
   // Delete from the indexes
   UpdateIndexesOnTable(txn, delete_record->GetDatabaseOid(), delete_record->GetTableOid(), sql_table_ptr,
-                       new_tuple_slot, pr, false /* delete */);
+                       new_tuple_slot, pr, false);
+
   // We can delete the TupleSlot from the map
   tuple_slot_map_.erase(delete_record->GetTupleSlot());
   delete[] buffer;
@@ -1173,11 +1181,9 @@ const catalog::Schema &RecoveryManager::GetTableSchema(
 
 void dos(void *stuff) {}
 
-void InsertCallback (byte* tuples, uint32_t num_tuples, uint32_t tuple_size) {
-  STORAGE_LOG_ERROR("num_tuples: {}, tuple_size: {}", num_tuples, tuple_size);
-}
+void DefaultCallback (byte* tuples, uint32_t num_tuples, uint32_t tuple_size) {}
 
-void RecoveryManager::InsertRedoRecordToInsertTranslator(transaction::TransactionContext *txn,
+void RecoveryManager::GenInsertReplay(transaction::TransactionContext *txn,
                                                          common::ManagedPointer<storage::SqlTable> sql_table,
                                                          storage::RedoRecord *redo_record,
                                                          std::vector<byte *> varlen_contents) {
@@ -1399,16 +1405,13 @@ void RecoveryManager::InsertRedoRecordToInsertTranslator(transaction::Transactio
     }
   }
 
-  execution::exec::OutputCallback callback = InsertCallback;
+  execution::exec::OutputCallback callback = DefaultCallback;
   auto exec_ctx = std::make_unique<execution::exec::ExecutionContext>(
       redo_record->GetDatabaseOid(), common::ManagedPointer<transaction::TransactionContext>(txn), callback,
                                         out_schema.get(), common::ManagedPointer<catalog::CatalogAccessor>(accessor), exec_settings, DISABLED, DISABLED, DISABLED);
-  //if (found) {
-    exec_ctx->SetParams(common::ManagedPointer<const std::vector<parser::ConstantValueExpression>>(&params));
-  //}
+  exec_ctx->SetParams(common::ManagedPointer<const std::vector<parser::ConstantValueExpression>>(&params));
 
   //auto t2 = std::chrono::high_resolution_clock::now();
-
   exec_queries_[query_identifier]->Run(common::ManagedPointer(exec_ctx), execution::vm::ExecutionMode::Compiled);
   //auto t3 = std::chrono::high_resolution_clock::now();
   //EXECUTION_LOG_ERROR("Prep: {}, Run: {}", std::chrono::duration_cast<std::chrono::nanoseconds>(t2 - t0).count(), std::chrono::duration_cast<std::chrono::nanoseconds>(t3 - t2).count());
@@ -1419,7 +1422,7 @@ void RecoveryManager::InsertRedoRecordToInsertTranslator(transaction::Transactio
   tuple_slot_map_[old_tuple_slot] = new_tuple_slot;
 }
 
-void RecoveryManager::DeleteRecordToDeleteTranslator(transaction::TransactionContext *txn,
+void RecoveryManager::GenDeleteReplay(transaction::TransactionContext *txn,
                                                          common::ManagedPointer<storage::SqlTable> sql_table,
                                                          storage::DeleteRecord *delete_record,
                                                          storage::TupleSlot new_tuple_slot) {
@@ -1429,56 +1432,58 @@ void RecoveryManager::DeleteRecordToDeleteTranslator(transaction::TransactionCon
   execution::exec::ExecutionSettings exec_settings{};
   exec_settings.UpdateFromSettingsManager(settings_manager_);
 
+  /*auto db_catalog_ptr = GetDatabaseCatalog(txn, delete_record->GetDatabaseOid());
+  const auto &schema = GetTableSchema(txn, db_catalog_ptr, delete_record->GetTableOid());
+
+  // Fetch all the values so we can construct index keys after deleting from the sql table
+  std::vector<catalog::col_oid_t> all_table_oids;
+  std::vector<planner::OutputSchema::Column> cols;
+  for (const auto &col : schema.GetColumns()) {
+    all_table_oids.push_back(col.Oid());
+    cols.emplace_back(col.Name(), col.StoredExpression()->GetReturnValueType(), col.StoredExpression()->Copy());
+  }
+  
+  planner::SeqScanPlanNode::Builder seq_scan_builder;
+  seq_scan_builder.SetDatabaseOid(delete_record->GetDatabaseOid());
+  seq_scan_builder.SetTableOid(delete_record->GetTableOid());
+  seq_scan_builder.SetScanPredicate(nullptr);
+  seq_scan_builder.SetColumnOids(std::move(all_table_oids));
+  //seq_scan_builder.SetOutputSchema(std::make_unique<planner::OutputSchema>());
+  seq_scan_builder.SetOutputSchema(std::make_unique<planner::OutputSchema>(std::move(cols)));
+  std::unique_ptr<planner::SeqScanPlanNode> seq_scan_plan = seq_scan_builder.Build();*/
+
   // Convert the redo record into a plannode.
-  planner::TupleDeletePlanNode::Builder plan_builder;
+  planner::DeletePlanNode::Builder plan_builder;
+  //plan_builder.AddChild(std::move(seq_scan_plan));
   plan_builder.SetDatabaseOid(delete_record->GetDatabaseOid());
   plan_builder.SetTableOid(delete_record->GetTableOid());
 
   // Stores index objects.
-  //std::vector<catalog::index_oid_t> index_oids = accessor->GetIndexOids(delete_record->GetTableOid());
-  //plan_builder.SetIndexOids(std::move(index_oids));
-
+  std::vector<catalog::index_oid_t> index_oids = accessor->GetIndexOids(delete_record->GetTableOid());
+  plan_builder.SetIndexOids(std::move(index_oids));
   plan_builder.SetOutputSchema(std::make_unique<planner::OutputSchema>());
   
-  std::unique_ptr<planner::TupleDeletePlanNode> out_plan = plan_builder.Build();
-  out_plan->SetUseTupleSlot(true);
+  std::unique_ptr<planner::DeletePlanNode> out_plan = plan_builder.Build();
+  out_plan->SetUseRecoveryTupleSlot(true);
 
   // Compile the plannode.
   auto exec_query = execution::compiler::CompilationContext::Compile(*out_plan, exec_settings, accessor.get(),
                                                                      execution::compiler::CompilationMode::OneShot);
 
-  execution::exec::OutputCallback callback = InsertCallback;
+  execution::exec::OutputCallback callback = DefaultCallback;
   auto exec_ctx = std::make_unique<execution::exec::ExecutionContext>(
       delete_record->GetDatabaseOid(), common::ManagedPointer<transaction::TransactionContext>(txn), callback,
                                         out_plan->GetOutputSchema().Get(), common::ManagedPointer<catalog::CatalogAccessor>(accessor), exec_settings, DISABLED, DISABLED, DISABLED);
   exec_ctx->SetTupleSlot(new_tuple_slot);
   exec_query->Run(common::ManagedPointer(exec_ctx), execution::vm::ExecutionMode::Compiled);
-
-  // Process Index
-  // Fetch all the values so we can construct index keys after deleting from the sql table
-  auto db_catalog_ptr = GetDatabaseCatalog(txn, delete_record->GetDatabaseOid());
-  const auto &schema = GetTableSchema(txn, db_catalog_ptr, delete_record->GetTableOid());
-  std::vector<catalog::col_oid_t> all_table_oids;
-  for (const auto &col : schema.GetColumns()) {
-    all_table_oids.push_back(col.Oid());
-  }
-  auto sql_table_ptr = db_catalog_ptr->GetTable(common::ManagedPointer(txn), delete_record->GetTableOid());
-  auto initializer = sql_table_ptr->InitializerForProjectedRow(all_table_oids);
-  auto *buffer = common::AllocationUtil::AllocateAligned(initializer.ProjectedRowSize());
-  auto pr = initializer.InitializeRow(buffer);
-  sql_table_ptr->Select(common::ManagedPointer(txn), new_tuple_slot, pr);
-
-  // Delete from the indexes
-  UpdateIndexesOnTable(txn, delete_record->GetDatabaseOid(), delete_record->GetTableOid(), sql_table_ptr,
-                       new_tuple_slot, pr, false /* delete */);
-  delete[] buffer;
   
   tuple_slot_map_.erase(new_tuple_slot);
 }
 
-void RecoveryManager::UpdateRecordToUpdateTranslator(transaction::TransactionContext *txn,
+void RecoveryManager::GenUpdateReplay(transaction::TransactionContext *txn,
                                                          common::ManagedPointer<storage::SqlTable> sql_table,
-                                                         storage::RedoRecord *redo_record) {
+                                                         storage::LogRecord *record) {
+  auto *redo_record = record->GetUnderlyingRecordBodyAs<RedoRecord>();
   std::unique_ptr<catalog::CatalogAccessor> accessor =
       catalog_->GetAccessor(common::ManagedPointer(txn), redo_record->GetDatabaseOid(), DISABLED);
   
@@ -1488,27 +1493,32 @@ void RecoveryManager::UpdateRecordToUpdateTranslator(transaction::TransactionCon
   auto new_tuple_slot = tuple_slot_map_[redo_record->GetTupleSlot()];
 
   // Convert the redo record into a plannode.
-  planner::TupleUpdatePlanNode::Builder plan_builder;
+  planner::UpdatePlanNode::Builder plan_builder;
   plan_builder.SetDatabaseOid(redo_record->GetDatabaseOid());
   plan_builder.SetTableOid(redo_record->GetTableOid());
-
   plan_builder.SetOutputSchema(std::make_unique<planner::OutputSchema>());
+
+  // Stores index objects.
+  std::vector<catalog::index_oid_t> index_oids = accessor->GetIndexOids(redo_record->GetTableOid());
+  plan_builder.SetIndexOids(std::move(index_oids));
   
-  std::unique_ptr<planner::TupleUpdatePlanNode> out_plan = plan_builder.Build();
-  out_plan->SetUseTupleSlot(true);
+  std::unique_ptr<planner::UpdatePlanNode> out_plan = plan_builder.Build();
+  out_plan->SetUseRecoveryTupleSlot(true);
 
   // Compile the plannode.
   auto exec_query = execution::compiler::CompilationContext::Compile(*out_plan, exec_settings, accessor.get(),
                                                                      execution::compiler::CompilationMode::OneShot);
 
-  execution::exec::OutputCallback callback = InsertCallback;
+  execution::exec::OutputCallback callback = DefaultCallback;
   auto exec_ctx = std::make_unique<execution::exec::ExecutionContext>(
       redo_record->GetDatabaseOid(), common::ManagedPointer<transaction::TransactionContext>(txn), callback,
                                         out_plan->GetOutputSchema().Get(), common::ManagedPointer<catalog::CatalogAccessor>(accessor), exec_settings, DISABLED, DISABLED, DISABLED);
+  redo_record->SetTupleSlot(new_tuple_slot);
+  // Stage the write. This way the recovery operation is logged if logging is enabled
+  //auto staged_record = txn->StageRecoveryWrite(record);
   exec_ctx->SetTupleSlot(new_tuple_slot);
-  exec_query->Run(common::ManagedPointer(exec_ctx), execution::vm::ExecutionMode::Interpret);
-
-
+  exec_ctx->SetRedoRecord(redo_record);
+  exec_query->Run(common::ManagedPointer(exec_ctx), execution::vm::ExecutionMode::Compiled);
 }
 
 }  // namespace noisepage::storage
