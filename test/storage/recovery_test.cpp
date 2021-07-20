@@ -237,20 +237,20 @@ class RecoveryTests : public TerrierTest {
     db_main_->GetTransactionLayer()->GetDeferredActionManager()->RegisterDeferredAction([=]() { delete tested; });
   }
 };
-/*
+
 // This test inserts some tuples into a single table. It then recreates the test table from
 // the log, and verifies that this new table is the same as the original table
 // NOLINTNEXTLINE
 TEST_F(RecoveryTests, SingleTableInsertTest) {
   LargeSqlTableTestConfiguration config = LargeSqlTableTestConfiguration::Builder()
-      .SetNumDatabases(1)
-      .SetNumTables(1)
-      .SetMaxColumns(5)
-      .SetInitialTableSize(100)
-      .SetTxnLength(5)
-      .SetInsertUpdateSelectDeleteRatio({1.0, 0.0, 0.0, 0.0})
-      .SetVarlenAllowed(false)
-      .Build();
+                                              .SetNumDatabases(1)
+                                              .SetNumTables(1)
+                                              .SetMaxColumns(5)
+                                              .SetInitialTableSize(100)
+                                              .SetTxnLength(5)
+                                              .SetInsertUpdateSelectDeleteRatio({1.0, 0.0, 0.0, 0.0})
+                                              .SetVarlenAllowed(false)
+                                              .Build();
   RecoveryTests::RunTest(config);
 }
 
@@ -327,7 +327,7 @@ TEST_F(RecoveryTests, DropDatabaseTest) {
   EXPECT_FALSE(recovery_catalog_->GetDatabaseCatalog(common::ManagedPointer(txn), db_oid));
   recovery_txn_manager_->Commit(txn, transaction::TransactionUtil::EmptyCallback, nullptr);
 }
-*/
+
 // Tests that we correctly process records corresponding to a drop table command.
 // NOLINTNEXTLINE
 TEST_F(RecoveryTests, DropTableTest) {
@@ -744,10 +744,10 @@ TEST_F(RecoveryTests, DoubleRecoveryTest) {
 
   // Instantiate a new recovery manager, and recover the tables.
   DiskLogProvider secondary_log_provider(secondary_log_file);
-  RecoveryManager secondary_recovery_manager(common::ManagedPointer<AbstractLogProvider>(&secondary_log_provider),
-                                             secondary_recovery_catalog, secondary_recovery_txn_manager,
-                                             secondary_recovery_deferred_action_manager, DISABLED,
-                                             secondary_recovery_thread_registry, secondary_recovery_block_store, settings_manager_);
+  RecoveryManager secondary_recovery_manager(
+      common::ManagedPointer<AbstractLogProvider>(&secondary_log_provider), secondary_recovery_catalog,
+      secondary_recovery_txn_manager, secondary_recovery_deferred_action_manager, DISABLED,
+      secondary_recovery_thread_registry, secondary_recovery_block_store, settings_manager_);
   secondary_recovery_manager.StartRecovery();
   secondary_recovery_manager.WaitForRecoveryToFinish();
 

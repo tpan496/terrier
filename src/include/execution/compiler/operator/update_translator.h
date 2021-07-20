@@ -136,11 +136,13 @@ class UpdateTranslator : public OperatorTranslator, public PipelineDriver {
 
   // Codegen Replication only.
   // Sets the tuple slot to delete.
-    // thread local tuple slot
+  // thread local tuple slot
   StateDescriptor::Entry tuple_slot_;
 
   // The number of updates that are performed.
   StateDescriptor::Entry num_updates_;
+
+  ast::Identifier table_pr_;
 };
 
 }  // namespace noisepage::execution::compiler

@@ -633,6 +633,7 @@ void OperatingUnitRecorder::Visit(const planner::InsertPlanNode *plan) {
 }
 
 void OperatingUnitRecorder::Visit(const planner::UpdatePlanNode *plan) {
+  if (plan->UseRecoveryMode()) return;
   std::vector<catalog::col_oid_t> cols;
   for (auto &clause : plan->GetSetClauses()) {
     auto features = OperatingUnitUtil::ExtractFeaturesFromExpression(clause.second);

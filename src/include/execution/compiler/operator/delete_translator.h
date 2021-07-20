@@ -85,6 +85,8 @@ class DeleteTranslator : public OperatorTranslator, public PipelineDriver {
   // Generates code to delete from the indexes.
   void GenIndexDelete(FunctionBuilder *builder, WorkContext *context, const catalog::index_oid_t &index_oid) const;
 
+  static std::vector<catalog::col_oid_t> CollectOids(const catalog::Schema &schema);
+
  private:
   // Storage interface for deletes.
   StateDescriptor::Entry si_deleter_;
@@ -100,6 +102,16 @@ class DeleteTranslator : public OperatorTranslator, public PipelineDriver {
   StateDescriptor::Entry num_deletes_;
 
   ast::Identifier table_pr_;
+
+  // Schema of the table we are updating.
+  const catalog::Schema &table_schema_;
+
+  // All the column oids of the table we ae updating.
+  std::vector<catalog::col_oid_t> all_oids_;
+
+  // Projection map of the table that we are updating.
+  // This maps column oids to offsets in a projected row.
+  storage::ProjectionMap table_pm_;
 };
 
 }  // namespace noisepage::execution::compiler

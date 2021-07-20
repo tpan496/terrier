@@ -21,9 +21,11 @@ UpdateTranslator::UpdateTranslator(const planner::UpdatePlanNode &plan, Compilat
       col_oids_(GetCodeGen()->MakeFreshIdentifier("col_oids")),
       table_schema_(GetCodeGen()->GetCatalogAccessor()->GetSchema(plan.GetTableOid())),
       all_oids_(CollectOids(table_schema_)),
-      table_pm_(GetCodeGen()->GetCatalogAccessor()->GetTable(plan.GetTableOid())->ProjectionMapForOids(all_oids_)) {
+      table_pm_(GetCodeGen()->GetCatalogAccessor()->GetTable(plan.GetTableOid())->ProjectionMapForOids(all_oids_)),
+      // Recovery
+      table_pr_(GetCodeGen()->MakeFreshIdentifier("table_pr")) {
   pipeline->RegisterSource(this, Pipeline::Parallelism::Serial);
-  if (!plan.UseRecoveryTupleSlot()) {
+  if (!plan.UseRecoveryMode()) {
     compilation_context->Prepare(*plan.GetChild(0), pipeline);
     for (const auto &clause : plan.GetSetClauses()) {
       compilation_context->Prepare(*clause.second);
@@ -62,6 +64,35 @@ void UpdateTranslator::PerformPipelineWork(WorkContext *context, FunctionBuilder
 
   const auto &op = GetPlanAs<planner::UpdatePlanNode>();
 
+  if (op.UseRecoveryMode()) {
+    GenTableUpdate(function);
+
+    if (op.GetIndexedUpdate()) {
+      // For indexed updates, we need to re-insert into the table, and then delete-and-insert into every index.
+      // var insert_slot = @tableInsert(&pipelineState.storageInterface)
+      // GenTableInsert(function);
+      const auto &indexes = GetPlanAs<planner::UpdatePlanNode>().GetIndexOids();
+
+      // var table_pr : *ProjectedRow
+      auto *pr_type = GetCodeGen()->BuiltinType(ast::BuiltinType::Kind::ProjectedRow);
+      function->Append(GetCodeGen()->DeclareVar(table_pr_, GetCodeGen()->PointerType(pr_type), nullptr));
+
+      // table_pr = @getTablePR()
+      auto *get_pr_call = GetCodeGen()->CallBuiltin(ast::Builtin::GetTablePR, {si_updater_.GetPtr(GetCodeGen())});
+      function->Append(GetCodeGen()->Assign(GetCodeGen()->MakeExpr(table_pr_), get_pr_call));
+
+      for (const auto &index_oid : indexes) {
+        GenIndexDelete(function, context, index_oid);
+        GenIndexInsert(context, function, index_oid);
+      }
+    }
+
+    function->Append(GetCodeGen()->ExecCtxAddRowsAffected(GetExecutionContext(), 1));
+
+    CounterAdd(function, num_updates_, 1);
+    return;
+  }
+
   if (op.GetIndexedUpdate()) {
     // For indexed updates, we need to call delete first.
     // if (!@tableDelete(&pipelineState.storageInterface, &slot)) { Abort(); }
@@ -80,6 +111,7 @@ void UpdateTranslator::PerformPipelineWork(WorkContext *context, FunctionBuilder
     // var insert_slot = @tableInsert(&pipelineState.storageInterface)
     GenTableInsert(function);
     const auto &indexes = GetPlanAs<planner::UpdatePlanNode>().GetIndexOids();
+
     for (const auto &index_oid : indexes) {
       GenIndexDelete(function, context, index_oid);
       GenIndexInsert(context, function, index_oid);
@@ -88,7 +120,7 @@ void UpdateTranslator::PerformPipelineWork(WorkContext *context, FunctionBuilder
     // Non-indexed updates just update.
     GenTableUpdate(function);
   }
-  
+
   function->Append(GetCodeGen()->ExecCtxAddRowsAffected(GetExecutionContext(), 1));
 
   CounterAdd(function, num_updates_, 1);
@@ -212,7 +244,7 @@ void UpdateTranslator::GenSetTablePR(FunctionBuilder *builder, WorkContext *cont
 void UpdateTranslator::GenTableUpdate(FunctionBuilder *builder) const {
   // if (!tableUpdate(&pipelineState.storageInterface) { Abort(); }
   const auto &op = GetPlanAs<planner::UpdatePlanNode>();
-  if (op.UseRecoveryTupleSlot()) {
+  if (op.UseRecoveryMode()) {
     std::vector<ast::Expr *> update_args{si_updater_.GetPtr(GetCodeGen()), tuple_slot_.GetPtr(GetCodeGen())};
     auto *update_call = GetCodeGen()->CallBuiltin(ast::Builtin::TableUpdate, update_args);
 
@@ -276,14 +308,14 @@ void UpdateTranslator::GenIndexInsert(WorkContext *context, FunctionBuilder *bui
 void UpdateTranslator::GenTableDelete(FunctionBuilder *builder) const {
   // if (!@tableDelete(&pipelineState.storageInterface, &slot)) { Abort(); }
   const auto &op = GetPlanAs<planner::UpdatePlanNode>();
-  if (op.UseRecoveryTupleSlot()) {
+  if (op.UseRecoveryMode()) {
     std::vector<ast::Expr *> delete_args{si_updater_.GetPtr(GetCodeGen()), tuple_slot_.GetPtr(GetCodeGen())};
     auto *delete_call = GetCodeGen()->CallBuiltin(ast::Builtin::TableDelete, delete_args);
     auto *delete_failed = GetCodeGen()->UnaryOp(parsing::Token::Type::BANG, delete_call);
     If check(builder, delete_failed);
     {
       // The delete was not successful; abort the transaction.
-      //CounterAdd(builder, num_deletes_, 1);
+      // CounterAdd(builder, num_deletes_, 1);
       builder->Append(GetCodeGen()->AbortTxn(GetExecutionContext()));
     }
     check.EndIf();
@@ -318,21 +350,43 @@ void UpdateTranslator::GenIndexDelete(FunctionBuilder *builder, WorkContext *con
   const auto &index_cols = index_schema.GetColumns();
 
   const auto &op = GetPlanAs<planner::UpdatePlanNode>();
-  const auto &child = GetCompilationContext()->LookupTranslator(*op.GetChild(0));
-  for (const auto &index_col : index_cols) {
-    // @prSetCall(delete_index_pr, type, nullable, attr_idx, val)
-    // NOTE: index expressions refer to columns in the child translator.
-    // For example, if the child is a seq scan, the index expressions would contain ColumnValueExpressions
-    const auto &val = context->DeriveValue(*index_col.StoredExpression().Get(), child);
-    auto *pr_set_call = GetCodeGen()->PRSet(GetCodeGen()->MakeExpr(delete_index_pr), index_col.Type(),
-                                            index_col.Nullable(), index_pm.at(index_col.Oid()), val, true);
-    builder->Append(GetCodeGen()->MakeStmt(pr_set_call));
-  }
+  if (op.UseRecoveryMode()) {
+    for (const auto &index_col : index_cols) {
+      // @prSetCall(delete_index_pr, type, nullable, attr_idx, val)
+      // NOTE: index expressions refer to columns in the child translator.
+      // For example, if the child is a seq scan, the index expressions would contain ColumnValueExpressions
+      const auto expr = static_cast<const parser::ColumnValueExpression &>(*index_col.StoredExpression().Get());
+      auto col_oid = expr.GetColumnOid();
+      auto type = table_schema_.GetColumn(col_oid).Type();
+      auto nullable = table_schema_.GetColumn(col_oid).Nullable();
+      uint16_t attr_idx = table_pm_.find(col_oid)->second;
+      const auto &val = GetCodeGen()->PRGet(GetCodeGen()->MakeExpr(table_pr_), type, nullable, attr_idx);
+      auto *pr_set_call = GetCodeGen()->PRSet(GetCodeGen()->MakeExpr(delete_index_pr), index_col.Type(),
+                                              index_col.Nullable(), index_pm.at(index_col.Oid()), val, true);
+      builder->Append(GetCodeGen()->MakeStmt(pr_set_call));
+    }
 
-  // @indexDelete(&pipelineState.storageInterface)
-  std::vector<ast::Expr *> delete_args{si_updater_.GetPtr(GetCodeGen()), child->GetSlotAddress()};
-  auto *index_delete_call = GetCodeGen()->CallBuiltin(ast::Builtin::IndexDelete, delete_args);
-  builder->Append(GetCodeGen()->MakeStmt(index_delete_call));
+    // @indexDelete(&pipelineState.storageInterface)
+    std::vector<ast::Expr *> delete_args{si_updater_.GetPtr(GetCodeGen()), tuple_slot_.GetPtr(GetCodeGen())};
+    auto *index_delete_call = GetCodeGen()->CallBuiltin(ast::Builtin::IndexDelete, delete_args);
+    builder->Append(GetCodeGen()->MakeStmt(index_delete_call));
+  } else {
+    const auto &child = GetCompilationContext()->LookupTranslator(*op.GetChild(0));
+    for (const auto &index_col : index_cols) {
+      // @prSetCall(delete_index_pr, type, nullable, attr_idx, val)
+      // NOTE: index expressions refer to columns in the child translator.
+      // For example, if the child is a seq scan, the index expressions would contain ColumnValueExpressions
+      const auto &val = context->DeriveValue(*index_col.StoredExpression().Get(), child);
+      auto *pr_set_call = GetCodeGen()->PRSet(GetCodeGen()->MakeExpr(delete_index_pr), index_col.Type(),
+                                              index_col.Nullable(), index_pm.at(index_col.Oid()), val, true);
+      builder->Append(GetCodeGen()->MakeStmt(pr_set_call));
+    }
+
+    // @indexDelete(&pipelineState.storageInterface)
+    std::vector<ast::Expr *> delete_args{si_updater_.GetPtr(GetCodeGen()), child->GetSlotAddress()};
+    auto *index_delete_call = GetCodeGen()->CallBuiltin(ast::Builtin::IndexDelete, delete_args);
+    builder->Append(GetCodeGen()->MakeStmt(index_delete_call));
+  }
 }
 
 std::vector<catalog::col_oid_t> UpdateTranslator::CollectOids(const catalog::Schema &schema) {

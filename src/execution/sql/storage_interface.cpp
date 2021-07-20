@@ -69,6 +69,10 @@ bool StorageInterface::TableDelete(storage::TupleSlot table_tuple_slot) {
 }
 
 bool StorageInterface::TableUpdate(storage::TupleSlot table_tuple_slot) {
+  if (exec_ctx_->UseRecoveryTupleSlot()) {
+    exec_ctx_->GetRedoRecord()->SetTupleSlot(*exec_ctx_->GetTupleSlot());
+    return table_->Update(exec_ctx_->GetTxn(), exec_ctx_->GetRedoRecord());
+  }
   table_redo_->SetTupleSlot(table_tuple_slot);
   return table_->Update(exec_ctx_->GetTxn(), table_redo_);
 }
@@ -96,10 +100,6 @@ bool StorageInterface::IndexInsertWithTuple(storage::TupleSlot table_tuple_slot,
     return curr_index_->InsertUnique(exec_ctx_->GetTxn(), *index_pr_, table_tuple_slot);
   }
   return curr_index_->Insert(exec_ctx_->GetTxn(), *index_pr_, table_tuple_slot);
-}
-
-void StorageInterface::SelectPR(storage::ProjectedRow* pr) {
-  table_->Select(exec_ctx_->GetTxn(), *exec_ctx_->GetTupleSlot(), pr);
 }
 
 }  // namespace noisepage::execution::sql

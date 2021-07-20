@@ -13,6 +13,7 @@
 #include "catalog/schema.h"
 #include "common/strong_typedef.h"
 #include "gtest/gtest.h"
+#include "loggers/storage_logger.h"
 #include "parser/expression/abstract_expression.h"
 #include "parser/expression/constant_value_expression.h"
 #include "storage/data_table.h"
@@ -28,7 +29,6 @@
 #include "test_util/random_test_util.h"
 #include "transaction/transaction_manager.h"
 #include "type/type_id.h"
-#include "loggers/storage_logger.h"
 
 namespace noisepage {
 class StorageTestUtil {
@@ -398,9 +398,9 @@ class StorageTestUtil {
     for (auto &tuple : table_one_tuples) {
       NOISEPAGE_ASSERT(tuple_slot_map.find(tuple) != tuple_slot_map.end(), "No mapping for this tuple slot");
       table_one->Select(common::ManagedPointer(txn_one), tuple, row_one);
-      //STORAGE_LOG_ERROR(fmt::format("Original Row: {}", PrintRow(row_one, layout)));
+      // STORAGE_LOG_ERROR(fmt::format("Original Row: {}", PrintRow(row_one, layout)));
       table_two->Select(common::ManagedPointer(txn_two), tuple_slot_map.at(tuple), row_two);
-      //STORAGE_LOG_ERROR(fmt::format("Recovered Row: {}", PrintRow(row_two, layout)));
+      // STORAGE_LOG_ERROR(fmt::format("Recovered Row: {}", PrintRow(row_two, layout)));
       if (!ProjectionListEqualDeep(layout, row_one, row_two)) {
         result = false;
         break;

@@ -9,9 +9,9 @@
 
 #include <chrono>
 
-using std::chrono::high_resolution_clock;
-using std::chrono::duration_cast;
 using std::chrono::duration;
+using std::chrono::duration_cast;
+using std::chrono::high_resolution_clock;
 using std::chrono::nanoseconds;
 
 extern "C" {
@@ -216,44 +216,40 @@ void OpStorageInterfaceInit(noisepage::execution::sql::StorageInterface *storage
 
 void OpStorageInterfaceGetTablePR(noisepage::storage::ProjectedRow **pr_result,
                                   noisepage::execution::sql::StorageInterface *storage_interface) {
-  //auto t1 = high_resolution_clock::now();
-  if (*storage_interface->GetExecutionContext()->GetTupleSlot() == noisepage::storage::TupleSlot()) {
-    *pr_result = storage_interface->GetTablePR();
+  // auto t1 = high_resolution_clock::now();
+  if (storage_interface->GetExecutionContext()->UseRecoveryTupleSlot()) {
+    *pr_result = storage_interface->GetExecutionContext()->GetDeleteTablePR();
   } else {
-    storage_interface->SelectPR(*pr_result);
+    *pr_result = storage_interface->GetTablePR();
   }
-  
-  //auto t2 = high_resolution_clock::now();
-  //auto ms_int = duration_cast<nanoseconds>(t2 - t1);
-  //EXECUTION_LOG_ERROR("OpStorageInterfaceGetTablePR: {}", ms_int.count());
+
+  // auto t2 = high_resolution_clock::now();
+  // auto ms_int = duration_cast<nanoseconds>(t2 - t1);
+  // EXECUTION_LOG_ERROR("storageInterfaceGetTablePR: {}", ms_int.count());
 }
 
 void OpStorageInterfaceTableUpdate(bool *result, noisepage::execution::sql::StorageInterface *storage_interface,
                                    noisepage::storage::TupleSlot *tuple_slot) {
-  if (*storage_interface->GetExecutionContext()->GetTupleSlot() == noisepage::storage::TupleSlot()) {
-    *result = storage_interface->TableUpdate(*tuple_slot);
-  } else {
-    *result = storage_interface->TableUpdate(*(storage_interface->GetExecutionContext()->GetTupleSlot()));
-  }
+  *result = storage_interface->TableUpdate(*tuple_slot);
 }
 
 void OpStorageInterfaceTableDelete(bool *result, noisepage::execution::sql::StorageInterface *storage_interface,
                                    noisepage::storage::TupleSlot *tuple_slot) {
-  if (*storage_interface->GetExecutionContext()->GetTupleSlot() == noisepage::storage::TupleSlot()) {
-    *result = storage_interface->TableDelete(*tuple_slot);
-  } else {
+  if (storage_interface->GetExecutionContext()->UseRecoveryTupleSlot()) {
     *result = storage_interface->TableDelete(*(storage_interface->GetExecutionContext()->GetTupleSlot()));
+  } else {
+    *result = storage_interface->TableDelete(*tuple_slot);
   }
 }
 
 void OpStorageInterfaceTableInsert(noisepage::storage::TupleSlot *tuple_slot,
                                    noisepage::execution::sql::StorageInterface *storage_interface) {
-  //auto t1 = high_resolution_clock::now();
+  // auto t1 = high_resolution_clock::now();
   *tuple_slot = storage_interface->TableInsert();
   storage_interface->GetExecutionContext()->SetTupleSlot(*tuple_slot);
-  //auto t2 = high_resolution_clock::now();
-  //auto ms_int = duration_cast<nanoseconds>(t2 - t1);
-  //EXECUTION_LOG_ERROR("OpStorageInterfaceInsert: {}", ms_int.count());
+  // auto t2 = high_resolution_clock::now();
+  // auto ms_int = duration_cast<nanoseconds>(t2 - t1);
+  // EXECUTION_LOG_ERROR("OpStorageInterfaceInsert: {}", ms_int.count());
 }
 
 void OpStorageInterfaceGetIndexPR(noisepage::storage::ProjectedRow **pr_result,
@@ -284,7 +280,11 @@ void OpStorageInterfaceIndexInsertWithSlot(bool *result, noisepage::execution::s
 }
 void OpStorageInterfaceIndexDelete(noisepage::execution::sql::StorageInterface *storage_interface,
                                    noisepage::storage::TupleSlot *tuple_slot) {
-  storage_interface->IndexDelete(*tuple_slot);
+  if (storage_interface->GetExecutionContext()->UseRecoveryTupleSlot()) {
+    storage_interface->IndexDelete(*storage_interface->GetExecutionContext()->GetTupleSlot());
+  } else {
+    storage_interface->IndexDelete(*tuple_slot);
+  }
 }
 
 void OpStorageInterfaceFree(noisepage::execution::sql::StorageInterface *storage_interface) {
@@ -322,24 +322,24 @@ void OpExecutionContextInitHooks(noisepage::execution::exec::ExecutionContext *e
 
 void OpExecutionContextStartPipelineTracker(noisepage::execution::exec::ExecutionContext *const exec_ctx,
                                             noisepage::execution::pipeline_id_t pipeline_id) {
-  //auto t1 = high_resolution_clock::now();
-  //return;
+  // auto t1 = high_resolution_clock::now();
+  // return;
   exec_ctx->StartPipelineTracker(pipeline_id);
-  //auto t2 = high_resolution_clock::now();
-  //auto ms_int = duration_cast<nanoseconds>(t2 - t1);
-  //EXECUTION_LOG_ERROR("OpExecutionContextStartPipelineTracker: {}", ms_int.count());
+  // auto t2 = high_resolution_clock::now();
+  // auto ms_int = duration_cast<nanoseconds>(t2 - t1);
+  // EXECUTION_LOG_ERROR("OpExecutionContextStartPipelineTracker: {}", ms_int.count());
 }
 
 void OpExecutionContextEndPipelineTracker(noisepage::execution::exec::ExecutionContext *const exec_ctx,
                                           noisepage::execution::query_id_t query_id,
                                           noisepage::execution::pipeline_id_t pipeline_id,
                                           noisepage::selfdriving::ExecOUFeatureVector *const ouvec) {
-  //auto t1 = high_resolution_clock::now();
-  //return;
+  // auto t1 = high_resolution_clock::now();
+  // return;
   exec_ctx->EndPipelineTracker(query_id, pipeline_id, ouvec);
-  //auto t2 = high_resolution_clock::now();
-  //auto ms_int = duration_cast<nanoseconds>(t2 - t1);
-  //EXECUTION_LOG_ERROR("OpExecutionContextEndPipelineTracker: {}", ms_int.count());
+  // auto t2 = high_resolution_clock::now();
+  // auto ms_int = duration_cast<nanoseconds>(t2 - t1);
+  // EXECUTION_LOG_ERROR("OpExecutionContextEndPipelineTracker: {}", ms_int.count());
 }
 
 void OpExecOUFeatureVectorRecordFeature(
@@ -353,24 +353,24 @@ void OpExecOUFeatureVectorRecordFeature(
 void OpExecOUFeatureVectorInitialize(noisepage::execution::exec::ExecutionContext *const exec_ctx,
                                      noisepage::selfdriving::ExecOUFeatureVector *const ouvec,
                                      noisepage::execution::pipeline_id_t pipeline_id, bool is_parallel) {
-  //auto t1 = high_resolution_clock::now();
-  //return;
+  // auto t1 = high_resolution_clock::now();
+  // return;
   if (is_parallel)
     exec_ctx->InitializeParallelOUFeatureVector(ouvec, pipeline_id);
   else
     exec_ctx->InitializeOUFeatureVector(ouvec, pipeline_id);
-  //auto t2 = high_resolution_clock::now();
-  //auto ms_int = duration_cast<nanoseconds>(t2 - t1);
-  //EXECUTION_LOG_ERROR("OpExecOUFeatureVectorInit: {}", ms_int.count());
+  // auto t2 = high_resolution_clock::now();
+  // auto ms_int = duration_cast<nanoseconds>(t2 - t1);
+  // EXECUTION_LOG_ERROR("OpExecOUFeatureVectorInit: {}", ms_int.count());
 }
 
-void OpExecOUFeatureVectorReset(noisepage::selfdriving::ExecOUFeatureVector *const ouvec) { 
-  //auto t1 = high_resolution_clock::now();
-  //return;
+void OpExecOUFeatureVectorReset(noisepage::selfdriving::ExecOUFeatureVector *const ouvec) {
+  // auto t1 = high_resolution_clock::now();
+  // return;
   ouvec->Reset();
-  //auto t2 = high_resolution_clock::now();
-  //auto ms_int = duration_cast<nanoseconds>(t2 - t1);
-  //EXECUTION_LOG_ERROR("OpExecOUFeatureVectorReset: {}", ms_int.count());
+  // auto t2 = high_resolution_clock::now();
+  // auto ms_int = duration_cast<nanoseconds>(t2 - t1);
+  // EXECUTION_LOG_ERROR("OpExecOUFeatureVectorReset: {}", ms_int.count());
 }
 
 void OpExecutionContextSetMemoryUseOverride(noisepage::execution::exec::ExecutionContext *const exec_ctx,
@@ -390,12 +390,12 @@ void OpExecOUFeatureVectorFilter(noisepage::selfdriving::ExecOUFeatureVector *co
 }
 
 void OpRegisterThreadWithMetricsManager(noisepage::execution::exec::ExecutionContext *exec_ctx) {
-  //auto t1 = high_resolution_clock::now();
-  //return;
+  // auto t1 = high_resolution_clock::now();
+  // return;
   exec_ctx->RegisterThreadWithMetricsManager();
-  //auto t2 = high_resolution_clock::now();
-  //auto ms_int = duration_cast<nanoseconds>(t2 - t1);
-  //EXECUTION_LOG_ERROR("OpRegisterThreadWithMetricsManager: {}", ms_int.count());
+  // auto t2 = high_resolution_clock::now();
+  // auto ms_int = duration_cast<nanoseconds>(t2 - t1);
+  // EXECUTION_LOG_ERROR("OpRegisterThreadWithMetricsManager: {}", ms_int.count());
 }
 
 void OpEnsureTrackersStopped(noisepage::execution::exec::ExecutionContext *exec_ctx) {

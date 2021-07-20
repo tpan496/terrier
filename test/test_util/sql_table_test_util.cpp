@@ -4,9 +4,9 @@
 #include <vector>
 
 #include "catalog/database_catalog.h"
+#include "loggers/storage_logger.h"
 #include "storage/sql_table.h"
 #include "test_util/catalog_test_util.h"
-#include "loggers/storage_logger.h"
 
 namespace noisepage {
 

@@ -202,9 +202,9 @@ class UpdatePlanNode : public AbstractPlanNode {
    */
   const std::vector<catalog::index_oid_t> &GetIndexOids() const { return index_oids_; }
 
-  void SetUseRecoveryTupleSlot(bool use) { use_tuple_slot_ = use; }
-  
-  bool UseRecoveryTupleSlot() const { return use_tuple_slot_; }
+  void SetUseRecoveryMode(bool use) { use_recovery_mode_ = use; }
+
+  bool UseRecoveryMode() const { return use_recovery_mode_; }
 
   /**
    * @return the hashed value of this plan node
@@ -249,7 +249,7 @@ class UpdatePlanNode : public AbstractPlanNode {
    */
   std::vector<catalog::index_oid_t> index_oids_;
 
-  bool use_tuple_slot_ = false;
+  bool use_recovery_mode_ = false;
 };
 
 DEFINE_JSON_HEADER_DECLARATIONS(UpdatePlanNode);

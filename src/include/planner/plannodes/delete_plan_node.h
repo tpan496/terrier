@@ -123,12 +123,12 @@ class DeletePlanNode : public AbstractPlanNode {
   /**
    * Enables the plan node to use the tuple slot provided by recovery during execution or not.
    */
-  void SetUseRecoveryTupleSlot(bool use) { use_recovery_tuple_slot_ = use; }
+  void SetUseRecoveryMode(bool use) { use_recovery_mode_ = use; }
 
   /**
    * @return whether to use the tuple slot from recovery.
    */
-  bool UseRecoveryTupleSlot() const { return use_recovery_tuple_slot_; }
+  bool UseRecoveryMode() const { return use_recovery_mode_; }
 
   /** @return the hashed value of this plan node */
   common::hash_t Hash() const override;
@@ -156,7 +156,7 @@ class DeletePlanNode : public AbstractPlanNode {
    */
   std::vector<catalog::index_oid_t> index_oids_;
 
-  bool use_recovery_tuple_slot_ = false;
+  bool use_recovery_mode_ = false;
 };
 
 DEFINE_JSON_HEADER_DECLARATIONS(DeletePlanNode);

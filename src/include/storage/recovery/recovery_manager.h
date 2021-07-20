@@ -18,15 +18,15 @@
 #include "catalog/postgres/pg_namespace.h"
 #include "catalog/postgres/pg_type.h"
 #include "common/dedicated_thread_owner.h"
+#include "execution/compiler/executable_query.h"
+#include "execution/sql/value_util.h"
+#include "loggers/storage_logger.h"
 #include "storage/recovery/abstract_log_provider.h"
 #include "storage/sql_table.h"
-#include "loggers/storage_logger.h"
-#include "execution/sql/value_util.h"
-#include "execution/compiler/executable_query.h"
 
 namespace noisepage::settings {
 class SettingsManager;
-} // namespace noisepage::settings
+}  // namespace noisepage::settings
 
 namespace noisepage {
 class RecoveryBenchmark;
@@ -47,9 +47,8 @@ namespace noisepage::storage {
  * TODO(Gus): Add more documentation when API is finalized
  */
 class RecoveryManager : public common::DedicatedThreadOwner {
-
   using OwnedExpression = std::unique_ptr<parser::AbstractExpression>;
-  using ManagedExpression = common::ManagedPointer<parser::AbstractExpression>; 
+  using ManagedExpression = common::ManagedPointer<parser::AbstractExpression>;
 
   ManagedExpression MakeManaged(OwnedExpression &&expr) {
     owned_exprs_.emplace_back(std::move(expr));
@@ -433,32 +432,29 @@ class RecoveryManager : public common::DedicatedThreadOwner {
   const catalog::Schema &GetTableSchema(transaction::TransactionContext *txn,
                                         const common::ManagedPointer<catalog::DatabaseCatalog> &db_catalog,
                                         catalog::table_oid_t table_oid) const;
-  
+
   bool IsSpecialPGTables(catalog::table_oid_t table_oid);
 
   bool use_codegen_recovery_ = true;
 
-  void GenInsertReplay(transaction::TransactionContext *txn,
-                                          common::ManagedPointer<storage::SqlTable> sql_table,
-                                          storage::RedoRecord *redo_record,
-                                          std::vector<byte *> varlen_contents);
+  void GenInsertReplay(transaction::TransactionContext *txn, common::ManagedPointer<storage::SqlTable> sql_table,
+                       storage::RedoRecord *redo_record, std::vector<byte *> varlen_contents);
 
-  void GenDeleteReplay(transaction::TransactionContext *txn,
-                                          common::ManagedPointer<storage::SqlTable> sql_table,
-                                          storage::DeleteRecord *delete_record,
-                                          storage::TupleSlot new_tuple_slot);
-  
-  void GenUpdateReplay(transaction::TransactionContext *txn,
-                                          common::ManagedPointer<storage::SqlTable> sql_table,
-                                          storage::LogRecord *record);
+  void GenDeleteReplay(transaction::TransactionContext *txn, common::ManagedPointer<storage::SqlTable> sql_table,
+                       storage::DeleteRecord *delete_record, storage::TupleSlot new_tuple_slot);
+
+  void GenUpdateReplay(transaction::TransactionContext *txn, common::ManagedPointer<storage::SqlTable> sql_table,
+                       storage::LogRecord *record);
 
   /**
    * Information about cached executable queries
    * Assumes that the query string is a unique identifier.
    */
-  std::map<std::pair<uint32_t, uint32_t>, std::unique_ptr<execution::compiler::ExecutableQuery>> exec_queries_;
+  std::map<std::pair<uint32_t, uint32_t>, std::unique_ptr<execution::compiler::ExecutableQuery>> insert_queries_;
+  std::map<std::pair<uint32_t, uint32_t>, std::unique_ptr<execution::compiler::ExecutableQuery>> delete_queries_;
+  std::map<std::pair<uint32_t, uint32_t>, std::unique_ptr<execution::compiler::ExecutableQuery>> update_queries_;
 
-  std::map<std::pair<uint32_t, uint32_t>, std::unordered_map<catalog::col_oid_t, type::TypeId>>  all_col_types_;
+  std::map<std::pair<uint32_t, uint32_t>, std::unordered_map<catalog::col_oid_t, type::TypeId>> all_col_types_;
   std::map<std::pair<uint32_t, uint32_t>, std::unordered_map<col_id_t, catalog::col_oid_t>> ids_to_oids_;
 };
 }  // namespace noisepage::storage

@@ -29,14 +29,14 @@ ExecutableQuery::Fragment::Fragment(std::vector<std::string> &&functions, std::v
 
 ExecutableQuery::Fragment::~Fragment() = default;
 
-using std::chrono::high_resolution_clock;
-using std::chrono::duration_cast;
 using std::chrono::duration;
+using std::chrono::duration_cast;
+using std::chrono::high_resolution_clock;
 using std::chrono::nanoseconds;
 
 void ExecutableQuery::Fragment::Run(byte query_state[], vm::ExecutionMode mode) const {
   using Function = std::function<void(void *)>;
-  //std::unordered_map<std::string, int> m;
+  // std::unordered_map<std::string, int> m;
 
   auto exec_ctx = *reinterpret_cast<exec::ExecutionContext **>(query_state);
   if (exec_ctx->GetTxn()->MustAbort()) {
@@ -49,10 +49,10 @@ void ExecutableQuery::Fragment::Run(byte query_state[], vm::ExecutionMode mode) 
                                 common::ErrorCode::ERRCODE_INTERNAL_ERROR);
     }
     try {
-      //auto t1 = high_resolution_clock::now();
+      // auto t1 = high_resolution_clock::now();
       func(query_state);
-      //auto t2 = high_resolution_clock::now();
-      //m[func_name] = duration_cast<nanoseconds>(t2 - t1).count();
+      // auto t2 = high_resolution_clock::now();
+      // m[func_name] = duration_cast<nanoseconds>(t2 - t1).count();
     } catch (const AbortException &e) {
       for (const auto &teardown_name : teardown_fn_) {
         if (!module_->GetFunction(teardown_name, mode, &func)) {
@@ -65,7 +65,7 @@ void ExecutableQuery::Fragment::Run(byte query_state[], vm::ExecutionMode mode) 
     }
   }
 
-  //for (auto& it : m) {
+  // for (auto& it : m) {
   //  EXECUTION_LOG_ERROR("{}: {}", it.first, it.second);
   //}
 }

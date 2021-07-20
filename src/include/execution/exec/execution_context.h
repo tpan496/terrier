@@ -46,7 +46,7 @@ class RecoveryManager;
 
 namespace noisepage::execution::sql {
 class StorageInterface;
-} // namespace noisepage::execution::sql
+}  // namespace noisepage::execution::sql
 
 namespace noisepage::execution::exec {
 class ExecutionSettings;
@@ -342,24 +342,29 @@ class EXPORT ExecutionContext {
    */
   void ClearHooks() { hooks_.clear(); }
 
+  bool UseRecoveryTupleSlot() { return use_recovery_tuple_slot_; }
+
   /**
    * Sets the tuple slot used for an Insert.
    */
-  void SetTupleSlot(storage::TupleSlot tuple_slot) { tuple_slot_ = tuple_slot; }
+  void SetTupleSlot(storage::TupleSlot tuple_slot) {
+    tuple_slot_ = tuple_slot;
+    use_recovery_tuple_slot_ = true;
+  }
 
-  void SetIndexPR(storage::ProjectedRow* pr) { index_pr_ = pr; }
+  void SetDeleteTablePR(storage::ProjectedRow *pr) { delete_table_pr_ = pr; }
 
-  void SetRedoRecord(storage::RedoRecord* redo_record) { redo_record_ = redo_record;}
+  void SetRedoRecord(storage::RedoRecord *redo_record) { redo_record_ = redo_record; }
 
   /**
    * Gets the tuple slot used for an Insert.
    * @return tuple slot
    */
-  storage::TupleSlot* GetTupleSlot() { return &tuple_slot_; }
+  storage::TupleSlot *GetTupleSlot() { return &tuple_slot_; }
 
-  storage::ProjectedRow* GetIndexPR() { return index_pr_; }
+  storage::ProjectedRow *GetDeleteTablePR() { return delete_table_pr_; }
 
-  storage::RedoRecord* GetRedoRecord() { return redo_record_; }
+  storage::RedoRecord *GetRedoRecord() { return redo_record_; }
 
  private:
   query_id_t query_id_{execution::query_id_t(0)};
@@ -392,8 +397,11 @@ class EXPORT ExecutionContext {
   uint32_t num_concurrent_estimate_ = 0;
   std::vector<HookFn> hooks_{};
   void *query_state_;
+
+  // For recovery
+  bool use_recovery_tuple_slot_ = false;
   storage::TupleSlot tuple_slot_;
-  storage::RedoRecord* redo_record_;
-  storage::ProjectedRow *index_pr_{nullptr};
+  storage::RedoRecord *redo_record_;
+  storage::ProjectedRow *delete_table_pr_;
 };
 }  // namespace noisepage::execution::exec

@@ -9,9 +9,9 @@
 #include "spdlog/fmt/fmt.h"
 #include "storage/index/index_defs.h"
 
-#include "loggers/execution_logger.h"
-#include "execution/ast/ast_pretty_print.h"
 #include <llvm/ADT/StringRef.h>
+#include "execution/ast/ast_pretty_print.h"
+#include "loggers/execution_logger.h"
 
 namespace noisepage::execution::compiler {
 
@@ -102,7 +102,7 @@ ast::Expr *CodeGen::ConstDouble(double val) const {
 }
 
 ast::Expr *CodeGen::ConstString(std::string_view str) const {
-  auto identifier =  MakeIdentifier(str);
+  auto identifier = MakeIdentifier(str);
   ast::Expr *expr = context_->GetNodeFactory()->NewStringLiteral(position_, identifier);
   expr->SetType(ast::StringType::Get(context_));
   return expr;

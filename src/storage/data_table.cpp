@@ -9,6 +9,8 @@
 #include "transaction/transaction_context.h"
 #include "transaction/transaction_util.h"
 
+#include "loggers/storage_logger.h"
+
 namespace noisepage::storage {
 
 DataTable::DataTable(common::ManagedPointer<BlockStore> store, const BlockLayout &layout,

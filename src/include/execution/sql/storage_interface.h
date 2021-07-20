@@ -19,7 +19,7 @@ class Index;
 
 namespace execution::vm {
 class VM;
-} // namespace noisepage::execution::vm
+}  // namespace execution::vm
 
 namespace noisepage::execution {
 
@@ -110,8 +110,6 @@ class EXPORT StorageInterface {
    */
   bool IndexInsertWithTuple(storage::TupleSlot table_tuple_slot, bool unique);
 
-  void SelectPR(storage::ProjectedRow* pr);
-
   /**
    * @returns index heap size
    */
@@ -121,7 +119,7 @@ class EXPORT StorageInterface {
    * Retrieves execution context.
    * @return execution context
    */
-  exec::ExecutionContext* GetExecutionContext() { return exec_ctx_; }
+  exec::ExecutionContext *GetExecutionContext() { return exec_ctx_; }
 
  protected:
   /**
