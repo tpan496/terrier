@@ -112,6 +112,8 @@ class DatabaseCatalog {
 
   /** @brief Get the schema for the specified table. */
   const Schema &GetSchema(common::ManagedPointer<transaction::TransactionContext> txn, table_oid_t table);
+  bool VerifyTableInsertConstraint(common::ManagedPointer<transaction::TransactionContext> txn, table_oid_t table, storage::ProjectedRow *pr);
+  
   /** @brief Get the index schema for the specified index. */
   const IndexSchema &GetIndexSchema(common::ManagedPointer<transaction::TransactionContext> txn, index_oid_t index);
 
@@ -345,5 +347,7 @@ class DatabaseCatalog {
   template <typename ClassOid, typename Ptr>
   bool SetClassPointer(common::ManagedPointer<transaction::TransactionContext> txn, ClassOid oid, const Ptr *pointer,
                        col_oid_t class_col);
+
+  //storage::ProjectedRowInitializer pg_constraints_all_cols_pri_;
 };
 }  // namespace noisepage::catalog

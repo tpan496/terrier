@@ -114,6 +114,9 @@ class InsertTranslator : public OperatorTranslator, public PipelineDriver {
   /** Insert into an index of this table. */
   void GenIndexInsert(WorkContext *context, FunctionBuilder *builder, const catalog::index_oid_t &index_oid) const;
 
+  /** Verify constraints. */
+  void GenConstraintVerify(FunctionBuilder *builder) const;
+
   /** Gets all the column oids in a schema. */
   static std::vector<catalog::col_oid_t> AllColOids(const catalog::Schema &table_schema);
 

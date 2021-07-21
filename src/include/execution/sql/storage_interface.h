@@ -90,6 +90,8 @@ class EXPORT StorageInterface {
    */
   void IndexDelete(storage::TupleSlot table_tuple_slot);
 
+  bool VerifyTableInsertConstraint();
+
   /**
    * Insert into the current index
    * @return Whether insertion was successful.

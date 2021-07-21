@@ -199,6 +199,8 @@ class EXPORT CatalogAccessor {
    */
   const Schema &GetSchema(table_oid_t table) const;
 
+  bool VerifyTableInsertConstraint(table_oid_t table, storage::ProjectedRow *pr);
+
   /**
    * A list of all constraints on this table
    * @param table being queried, this must be a valid oid from GetTableOid. Invalid input will trigger an assert

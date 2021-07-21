@@ -2177,6 +2177,13 @@ void VM::Interpret(const uint8_t *ip, Frame *frame) {  // NOLINT
     DISPATCH_NEXT();
   }
 
+  OP(StorageInterfaceVerifyTableInsertConstraint) : {
+    auto *result = frame->LocalAt<bool *>(READ_LOCAL_ID());
+    auto *storage_interface = frame->LocalAt<sql::StorageInterface *>(READ_LOCAL_ID());
+    OpStorageInterfaceVerifyTableInsertConstraint(result, storage_interface);
+    DISPATCH_NEXT();
+  }
+
   OP(StorageInterfaceFree) : {
     auto *storage_interface = frame->LocalAt<sql::StorageInterface *>(READ_LOCAL_ID());
     OpStorageInterfaceFree(storage_interface);

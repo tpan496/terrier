@@ -75,6 +75,7 @@ class PgConstraintImpl {
  private:
   friend class Builder;
   friend class storage::RecoveryManager;
+  friend class catalog::DatabaseCatalog;
 
   const db_oid_t db_oid_;
 

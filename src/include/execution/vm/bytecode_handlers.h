@@ -2097,6 +2097,9 @@ VM_OP void OpStorageInterfaceIndexInsertWithSlot(bool *result,
 VM_OP void OpStorageInterfaceIndexDelete(noisepage::execution::sql::StorageInterface *storage_interface,
                                          noisepage::storage::TupleSlot *tuple_slot);
 
+VM_OP void OpStorageInterfaceVerifyTableInsertConstraint(bool *result,
+                                                         noisepage::execution::sql::StorageInterface *storage_interface);
+
 VM_OP void OpStorageInterfaceFree(noisepage::execution::sql::StorageInterface *storage_interface);
 
 // ---------------------------------

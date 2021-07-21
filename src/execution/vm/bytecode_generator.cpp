@@ -2418,6 +2418,13 @@ void BytecodeGenerator::VisitBuiltinStorageInterfaceCall(ast::CallExpr *call, as
       break;
     }
 
+    case ast::Builtin::VerifyTableInsertConstraint: {
+      LocalVar cond = GetExecutionResult()->GetOrCreateDestination(ast::BuiltinType::Get(ctx, ast::BuiltinType::Bool));
+      GetEmitter()->Emit(Bytecode::StorageInterfaceVerifyTableInsertConstraint, cond, storage_interface);
+      GetExecutionResult()->SetDestination(cond.ValueOf());
+      break;
+    }
+
     case ast::Builtin::StorageInterfaceFree: {
       GetEmitter()->Emit(Bytecode::StorageInterfaceFree, storage_interface);
       break;
@@ -3049,6 +3056,7 @@ void BytecodeGenerator::VisitBuiltinCallExpr(ast::CallExpr *call) {
     case ast::Builtin::IndexInsertUnique:
     case ast::Builtin::IndexInsertWithSlot:
     case ast::Builtin::IndexDelete:
+    case ast::Builtin::VerifyTableInsertConstraint:
     case ast::Builtin::StorageInterfaceFree: {
       VisitBuiltinStorageInterfaceCall(call, builtin);
       break;

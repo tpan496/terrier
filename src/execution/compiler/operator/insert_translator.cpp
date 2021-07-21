@@ -121,6 +121,7 @@ void InsertTranslator::PerformInsertWork(
   generate_set_table_pr(context, function);
   // var insert_slot = @tableInsert(&pipelineState.storageInterface)
   GenTableInsert(function);
+  GenConstraintVerify(function);
   function->Append(GetCodeGen()->ExecCtxAddRowsAffected(GetExecutionContext(), 1));
   const auto &index_oids = GetPlanAs<planner::InsertPlanNode>().GetIndexOids();
   for (const auto &index_oid : index_oids) {
@@ -254,6 +255,14 @@ void InsertTranslator::GenIndexInsert(WorkContext *context, FunctionBuilder *bui
   const auto &builtin = index_schema.Unique() ? ast::Builtin::IndexInsertUnique : ast::Builtin::IndexInsert;
   auto *index_insert_call = GetCodeGen()->CallBuiltin(builtin, {si_inserter_.GetPtr(GetCodeGen())});
   auto *cond = GetCodeGen()->UnaryOp(parsing::Token::Type::BANG, index_insert_call);
+  If success(builder, cond);
+  { builder->Append(GetCodeGen()->AbortTxn(GetExecutionContext())); }
+  success.EndIf();
+}
+
+void InsertTranslator::GenConstraintVerify(FunctionBuilder *builder) const {
+  auto verify_constraint_call = GetCodeGen()->CallBuiltin(ast::Builtin::VerifyTableInsertConstraint, {si_inserter_.GetPtr(GetCodeGen())});
+  auto cond = GetCodeGen()->UnaryOp(parsing::Token::Type::BANG, verify_constraint_call);
   If success(builder, cond);
   { builder->Append(GetCodeGen()->AbortTxn(GetExecutionContext())); }
   success.EndIf();

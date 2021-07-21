@@ -102,4 +102,9 @@ bool StorageInterface::IndexInsertWithTuple(storage::TupleSlot table_tuple_slot,
   return curr_index_->Insert(exec_ctx_->GetTxn(), *index_pr_, table_tuple_slot);
 }
 
+bool StorageInterface::VerifyTableInsertConstraint() {
+  auto *pr = table_redo_->Delta();
+  return exec_ctx_->GetAccessor()->VerifyTableInsertConstraint(table_oid_, pr);
+}
+
 }  // namespace noisepage::execution::sql

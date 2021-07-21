@@ -287,6 +287,11 @@ void OpStorageInterfaceIndexDelete(noisepage::execution::sql::StorageInterface *
   }
 }
 
+void OpStorageInterfaceVerifyTableInsertConstraint(bool *result,
+    noisepage::execution::sql::StorageInterface *storage_interface) {
+  *result = storage_interface->VerifyTableInsertConstraint();
+}
+
 void OpStorageInterfaceFree(noisepage::execution::sql::StorageInterface *storage_interface) {
   storage_interface->~StorageInterface();
 }

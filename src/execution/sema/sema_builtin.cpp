@@ -2809,6 +2809,13 @@ void Sema::CheckBuiltinStorageInterfaceCall(ast::CallExpr *call, ast::Builtin bu
       call->SetType(GetBuiltinType(ast::BuiltinType::Nil));
       break;
     }
+    case ast::Builtin::VerifyTableInsertConstraint: {
+      if (!CheckArgCount(call, 1)) {
+        return;
+      }
+      call->SetType(GetBuiltinType(ast::BuiltinType::Bool));
+      break;
+    }
     case ast::Builtin::StorageInterfaceFree: {
       if (!CheckArgCount(call, 1)) {
         return;
@@ -3639,6 +3646,7 @@ void Sema::CheckBuiltinCall(ast::CallExpr *call) {
     case ast::Builtin::IndexInsertUnique:
     case ast::Builtin::IndexInsertWithSlot:
     case ast::Builtin::IndexDelete:
+    case ast::Builtin::VerifyTableInsertConstraint:
     case ast::Builtin::StorageInterfaceFree: {
       CheckBuiltinStorageInterfaceCall(call, builtin);
       break;

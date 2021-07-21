@@ -282,6 +282,7 @@ namespace noisepage::execution::ast {
   F(IndexInsertUnique, indexInsertUnique)                               \
   F(IndexInsertWithSlot, indexInsertWithSlot)                           \
   F(IndexDelete, indexDelete)                                           \
+  F(VerifyTableInsertConstraint, verifyTableInsertConstraint)           \
   F(StorageInterfaceFree, storageInterfaceFree)                         \
   /* Trig */                                                            \
   F(ACos, acos)                                                         \

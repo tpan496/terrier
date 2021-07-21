@@ -43,6 +43,7 @@
 #include "parser/expression/parameter_value_expression.h"
 
 #include <chrono>
+#include <valgrind/callgrind.h>
 
 namespace noisepage::storage {
 
@@ -1187,8 +1188,7 @@ void DefaultCallback(byte *tuples, uint32_t num_tuples, uint32_t tuple_size) {}
 void RecoveryManager::GenInsertReplay(transaction::TransactionContext *txn,
                                       common::ManagedPointer<storage::SqlTable> sql_table,
                                       storage::RedoRecord *redo_record, std::vector<byte *> varlen_contents) {
-  // auto t0 = std::chrono::high_resolution_clock::now();
-  // auto t1 = std::chrono::high_resolution_clock::now();
+  CALLGRIND_TOGGLE_COLLECT;
   std::unique_ptr<catalog::CatalogAccessor> accessor =
       catalog_->GetAccessor(common::ManagedPointer(txn), redo_record->GetDatabaseOid(), DISABLED);
 
@@ -1432,6 +1432,8 @@ void RecoveryManager::GenInsertReplay(transaction::TransactionContext *txn,
   auto new_tuple_slot = *exec_ctx->GetTupleSlot();
   auto old_tuple_slot = redo_record->GetTupleSlot();
   tuple_slot_map_[old_tuple_slot] = new_tuple_slot;
+
+  CALLGRIND_TOGGLE_COLLECT;
 }
 
 void RecoveryManager::GenDeleteReplay(transaction::TransactionContext *txn,
