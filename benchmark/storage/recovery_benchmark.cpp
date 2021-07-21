@@ -11,6 +11,8 @@
 #include "storage/storage_defs.h"
 #include "test_util/sql_table_test_util.h"
 
+#include <valgrind/callgrind.h>
+
 namespace noisepage {
 
 class RecoveryBenchmark : public benchmark::Fixture {
@@ -82,8 +84,12 @@ class RecoveryBenchmark : public benchmark::Fixture {
       {
         std::cout << "Recovery Start" << std::endl;
         common::ScopedTimer<std::chrono::milliseconds> timer(&elapsed_ms);
+        CALLGRIND_START_INSTRUMENTATION;
+        CALLGRIND_TOGGLE_COLLECT;
         recovery_manager.StartRecovery();
         recovery_manager.WaitForRecoveryToFinish();
+        CALLGRIND_TOGGLE_COLLECT;
+        CALLGRIND_STOP_INSTRUMENTATION;
         std::cout << "Recovery Ended" << std::endl;
       }
 
