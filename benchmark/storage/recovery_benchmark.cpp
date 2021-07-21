@@ -20,7 +20,7 @@ class RecoveryBenchmark : public benchmark::Fixture {
   void SetUp(const benchmark::State &state) final { unlink(noisepage::BenchmarkConfig::logfile_path.data()); }
   void TearDown(const benchmark::State &state) final { unlink(noisepage::BenchmarkConfig::logfile_path.data()); }
 
-  const uint32_t initial_table_size_ = 1000000;
+  const uint32_t initial_table_size_ = 100000;
   const uint32_t num_txns_ = 100000;
   const uint32_t num_indexes_ = 5;
   std::default_random_engine generator_;
@@ -259,7 +259,7 @@ common::ManagedPointer(settings_manager));
 BENCHMARK_REGISTER_F(RecoveryBenchmark, ReadWriteWorkload)
     ->Unit(benchmark::kMillisecond)
     ->UseManualTime()
-    ->MinTime(10);
+    ->MinTime(0);
 /*
 BENCHMARK_REGISTER_F(RecoveryBenchmark, HighStress)
     ->Unit(benchmark::kMillisecond)
